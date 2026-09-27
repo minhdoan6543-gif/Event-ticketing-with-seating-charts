@@ -1,0 +1,189 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ========================================================
+  # 1. Backend: Kiểm tra định dạng (Lint / Format)
+  # ========================================================
+  backend-lint-format:
+    name: "Backend / Format & Lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Thiết lập .NET SDK 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Kiểm tra định dạng code (dotnet format)
+        run: dotnet format src/backend/TicketBooking.sln --verify-no-changes --severity warn
+
+  # ========================================================
+  # 2. Backend: Build, Unit/Integration Test & Migration Test
+  # ========================================================
+  backend-build-test:
+    name: "Backend / Build & Tests (Postgres + Redis)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+
+    # Khởi tạo container dịch vụ phục vụ kiểm thử tích hợp và kiểm thử roundtrip migration
+    services:
+      postgres:
+        image: postgres:16.4-alpine3.20
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password_secure_123!
+          POSTGRES_DB: ticket_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.4.0-alpine3.20
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Thiết lập .NET SDK 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Khôi phục cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('src/backend/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore src/backend/TicketBooking.sln
+
+      - name: Build Backend (Release)
+        run: dotnet build src/backend/TicketBooking.sln --configuration Release --no-restore
+
+      - name: Chạy Backend Tests & Roundtrip Migration trên Database Test riêng
+        env:
+          TEST_POSTGRES_CONNECTION: "Host=localhost;Port=5432;Database=ticket_test_db;Username=test_user;Password=test_password_secure_123!"
+        run: >
+          dotnet test src/backend/TicketBooking.sln
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test_results.trx"
+
+      - name: Lưu trữ báo cáo kiểm thử
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: src/backend/TicketBooking.Tests/TestResults/test_results.trx
+          retention-days: 7
+
+  # ========================================================
+  # 3. Frontend: Lint & Typecheck
+  # ========================================================
+  frontend-lint-typecheck:
+    name: "Frontend / Lint & Typecheck"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Thiết lập Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Cài đặt dependencies (clean install)
+        run: npm ci
+
+      - name: Typecheck TypeScript (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: ESLint kiểm tra cú pháp và quy chuẩn code
+        run: npm run lint
+
+  # ========================================================
+  # 4. Frontend: Unit Test & Build
+  # ========================================================
+  frontend-build-test:
+    name: "Frontend / Tests & Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Thiết lập Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Cài đặt dependencies (clean install)
+        run: npm ci
+
+      - name: Chạy Frontend Unit Tests (Vitest)
+        run: npm run test
+
+      - name: Build Production Bundle (Vite)
+        run: npm run build
+
+  # ========================================================
+  # 5. Cổng kiểm soát hợp nhất (CI Gate)
+  # ========================================================
+  ci-gate:
+    name: "CI Gate / Toàn bộ kiểm tra vượt qua"
+    needs:
+      - backend-lint-format
+      - backend-build-test
+      - frontend-lint-typecheck
+      - frontend-build-test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Kiểm tra trạng thái của tất cả các luồng song song
+        run: |
+          if [ "${{ needs.backend-lint-format.result }}" != "success" ] || \
+             [ "${{ needs.backend-build-test.result }}" != "success" ] || \
+             [ "${{ needs.frontend-lint-typecheck.result }}" != "success" ] || \
+             [ "${{ needs.frontend-build-test.result }}" != "success" ]; then
+            echo "::error::Một hoặc nhiều luồng kiểm tra CI bắt buộc đã thất bại!"
+            exit 1
+          fi
+          echo "Toàn bộ kiểm tra CI (Backend + Frontend) đã hoàn thành xuất sắc!"
