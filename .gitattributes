@@ -1,0 +1,14 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Backend C# files must be checked out with CRLF to match .editorconfig across all platforms (Windows & Linux CI)
+src/backend/**/*.cs text eol=crlf
+src/backend/**/*.sln text eol=crlf
+src/backend/**/*.csproj text eol=crlf
+
+# Shell scripts must always use LF
+deploy/staging/scripts/*.sh text eol=lf
+*.sh text eol=lf
+
+# Frontend web files use LF
+src/frontend/**/*.{ts,tsx,js,jsx,json,css,html} text eol=lf
