@@ -1,6 +1,83 @@
-@TicketBooking.Api_HostAddress = http://localhost:5094
+@TicketBooking.Api_HostAddress = http://localhost:5000
 
-GET {{TicketBooking.Api_HostAddress}}/weatherforecast/
+### 1. Kiểm tra trạng thái hệ thống
+GET {{TicketBooking.Api_HostAddress}}/
 Accept: application/json
 
-###
+### 2. Lấy cấu trúc tệp sơ đồ ghế mẫu
+GET {{TicketBooking.Api_HostAddress}}/api/seating-charts/template
+Accept: application/json
+
+### 3. Kiểm tra tính hợp lệ của tệp sơ đồ ghế (Valid payload)
+POST {{TicketBooking.Api_HostAddress}}/api/seating-charts/validate
+Content-Type: application/json
+
+{
+  "layoutName": "Nhà hát Lớn Hà Nội - Tầng 1",
+  "venue": "Nhà hát Lớn",
+  "totalCapacity": 2,
+  "sections": [
+    {
+      "name": "VIP",
+      "category": "VIP",
+      "defaultPrice": 500000,
+      "rows": [
+        {
+          "rowNumber": "A",
+          "seats": [
+            { "seatNumber": "1", "price": 500000, "status": "Available", "x": 1, "y": 1 },
+            { "seatNumber": "2", "price": 500000, "status": "Available", "x": 2, "y": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+### 4. Kiểm tra từ chối toàn bộ khi sơ đồ có lỗi (Invalid payload - SCRUM-15 s-06)
+POST {{TicketBooking.Api_HostAddress}}/api/seating-charts/validate
+Content-Type: application/json
+
+{
+  "layoutName": "Nhà thi đấu lỗi",
+  "sections": [
+    {
+      "name": "Khu VIP",
+      "rows": [
+        {
+          "rowNumber": "A",
+          "seats": [
+            { "seatNumber": "1", "price": -50000, "status": "InvalidStatus", "x": -1, "y": 2 },
+            { "seatNumber": "1", "price": 100000, "status": "Available", "x": 1, "y": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+### 5. Tải lên sơ đồ ghế (Upload)
+POST {{TicketBooking.Api_HostAddress}}/api/seating-charts/upload
+Content-Type: application/json
+
+{
+  "layoutName": "Sân vận động Mỹ Đình - Khán đài A",
+  "venue": "Mỹ Đình",
+  "totalCapacity": 1,
+  "sections": [
+    {
+      "name": "Khán đài A1",
+      "category": "Standard",
+      "defaultPrice": 200000,
+      "rows": [
+        {
+          "rowNumber": "1",
+          "seats": [
+            { "seatNumber": "1", "price": 200000, "status": "Available", "x": 1, "y": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}
+

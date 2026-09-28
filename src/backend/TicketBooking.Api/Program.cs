@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StackExchange.Redis;
 using TicketBooking.Api.Data;
+using TicketBooking.Api.Endpoints;
 using TicketBooking.Api.HealthChecks;
+using TicketBooking.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,11 +97,14 @@ builder.Services.AddCors(options =>
     });
 });
 
+// 6. Đăng ký dịch vụ Nghiệp vụ & Xác thực sơ đồ ghế (SCRUM-15 / User Story s-06)
+builder.Services.AddSingleton<ISeatingChartValidator, SeatingChartValidator>();
+
 var app = builder.Build();
 
 app.UseCors();
 
-// 6. Endpoint Liveness Check (kiểm tra tiến trình đang chạy)
+// 7. Endpoint Liveness Check (kiểm tra tiến trình đang chạy)
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("live"),
@@ -112,7 +117,7 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
     }
 });
 
-// 7. Endpoint Readiness Check (kiểm tra PostgreSQL và Redis - trả 503 khi lỗi)
+// 8. Endpoint Readiness Check (kiểm tra PostgreSQL và Redis - trả 503 khi lỗi)
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
@@ -125,7 +130,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
     }
 });
 
-// 8. Thông tin cơ bản về hệ thống (User Story S-01)
+// 9. Thông tin cơ bản về hệ thống (User Story S-01)
 app.MapGet("/", () => Results.Ok(new
 {
     projectName = "Bán vé sự kiện có sơ đồ ghế",
@@ -135,10 +140,16 @@ app.MapGet("/", () => Results.Ok(new
     endpoints = new
     {
         liveness = "/health/live",
-        readiness = "/health/ready"
+        readiness = "/health/ready",
+        seatingChartValidate = "/api/seating-charts/validate",
+        seatingChartUpload = "/api/seating-charts/upload",
+        seatingChartTemplate = "/api/seating-charts/template"
     },
     timestamp = DateTimeOffset.UtcNow
 }));
+
+// 10. Endpoint xác thực và tiếp nhận sơ đồ ghế (User Story s-06: Tệp sơ đồ sai bị từ chối toàn bộ và chỉ rõ chỗ sai)
+app.MapSeatingChartEndpoints();
 
 app.Run();
 return 0;
