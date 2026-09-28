@@ -1,28 +1,42 @@
 version: '3.8'
 
+networks:
+  staging_network:
+    driver: bridge
+
 services:
   api:
     image: ghcr.io/${GITHUB_REPOSITORY}:staging
     container_name: event_ticketing_api_staging
     restart: always
     ports:
-      - "80:80"
+      - "8080:8080"
+      - "443:443"
     environment:
       - ASPNETCORE_ENVIRONMENT=Staging
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=event_ticketing_staging;Username=postgres;Password=${DB_PASSWORD}
-      - Redis__ConnectionString=redis:6379
+      - ASPNETCORE_HTTP_PORTS=8080
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=event_ticketing_staging
+      - DB_USER=postgres
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_CONNECTION=redis:6379
+    networks:
+      - staging_network
     depends_on:
       - db
       - redis
 
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: event_ticketing_db_staging
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=event_ticketing_staging
+    networks:
+      - staging_network
     volumes:
       - pgdata_staging:/var/lib/postgresql/data
 
@@ -30,6 +44,8 @@ services:
     image: redis:7-alpine
     container_name: event_ticketing_redis_staging
     restart: always
+    networks:
+      - staging_network
     volumes:
       - redisdata_staging:/data
 

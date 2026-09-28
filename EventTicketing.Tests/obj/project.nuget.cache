@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "fDzcMKdhXQM=",
+  "dgSpecHash": "tEb8yvZ/p14=",
   "success": true,
   "projectFilePath": "C:\\Users\\ADMIN\\Downloads\\Event-ticketing-with-seating-charts-main\\EventTicketing.Tests\\EventTicketing.Tests.csproj",
   "expectedPackageFiles": [
@@ -38,6 +38,7 @@
     "C:\\Users\\ADMIN\\.nuget\\packages\\npgsql\\10.0.3\\npgsql.10.0.3.nupkg.sha512",
     "C:\\Users\\ADMIN\\.nuget\\packages\\npgsql.entityframeworkcore.postgresql\\10.0.3\\npgsql.entityframeworkcore.postgresql.10.0.3.nupkg.sha512",
     "C:\\Users\\ADMIN\\.nuget\\packages\\respite\\3.3.1\\respite.3.3.1.nupkg.sha512",
+    "C:\\Users\\ADMIN\\.nuget\\packages\\scalar.aspnetcore\\2.17.10\\scalar.aspnetcore.2.17.10.nupkg.sha512",
     "C:\\Users\\ADMIN\\.nuget\\packages\\stackexchange.redis\\3.3.1\\stackexchange.redis.3.3.1.nupkg.sha512",
     "C:\\Users\\ADMIN\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.19.2\\system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512",
     "C:\\Users\\ADMIN\\.nuget\\packages\\system.io.hashing\\10.0.12\\system.io.hashing.10.0.12.nupkg.sha512",

@@ -135,3 +135,4 @@ C:\Users\ADMIN\Downloads\Event-ticketing-with-seating-charts-main\EventTicketing
 C:\Users\ADMIN\Downloads\Event-ticketing-with-seating-charts-main\EventTicketing.Api\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
 C:\Users\ADMIN\Downloads\Event-ticketing-with-seating-charts-main\EventTicketing.Api\bin\Debug\net10.0\System.IO.Hashing.dll
 C:\Users\ADMIN\Downloads\Event-ticketing-with-seating-charts-main\EventTicketing.Api\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
+C:\Users\ADMIN\Downloads\Event-ticketing-with-seating-charts-main\EventTicketing.Api\obj\Debug\net10.0\EventTicketing.Api.sourcelink.json

@@ -75,6 +75,10 @@
               "target": "Package",
               "version": "[10.0.3, )"
             },
+            "Scalar.AspNetCore": {
+              "target": "Package",
+              "version": "[2.17.10, )"
+            },
             "StackExchange.Redis": {
               "target": "Package",
               "version": "[3.3.1, )"
