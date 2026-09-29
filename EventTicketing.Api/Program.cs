@@ -46,6 +46,17 @@ if (!string.IsNullOrEmpty(redisConnection))
 
 builder.Services.AddHealthChecks();
 
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
 var app = builder.Build();
 
 // Automatically apply migrations at startup
@@ -58,12 +69,14 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 app.UseHttpsRedirection();
-app.MapHealthChecks("/health");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapHealthChecks("/health").AllowAnonymous();
 
 var summaries = new[]
 {
@@ -126,7 +139,8 @@ app.MapPost("/api/auth/login", async (LoginRequest request, AppDbContext db, ICo
 
     return Results.Ok(new { message = "Login successful", userId = user.Id });
 })
-.WithName("Login");
+.WithName("Login")
+.AllowAnonymous();
 
 app.Run();
 
