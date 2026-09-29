@@ -37,12 +37,21 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
                       ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
 
-if (!string.IsNullOrEmpty(redisConnection))
+if (string.IsNullOrEmpty(redisConnection) || redisConnection == "${REDIS_CONNECTION}")
 {
-    redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", Environment.GetEnvironmentVariable("REDIS_CONNECTION"));
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
-        StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
+    redisConnection = "localhost:6379";
 }
+else
+{
+    var envRedis = Environment.GetEnvironmentVariable("REDIS_CONNECTION");
+    if (!string.IsNullOrEmpty(envRedis))
+    {
+        redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", envRedis);
+    }
+}
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddHealthChecks();
 
