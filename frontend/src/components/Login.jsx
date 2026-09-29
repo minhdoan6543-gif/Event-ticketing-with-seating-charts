@@ -37,11 +37,7 @@ export default function Login() {
         setError('Login failed: No token received.');
       }
     } catch (err) {
-      if (err.response && err.response.data && err.response.data.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Invalid email or password');
-      }
+      setError(err.response?.data?.message || 'Invalid email or password');
     }
   };
 

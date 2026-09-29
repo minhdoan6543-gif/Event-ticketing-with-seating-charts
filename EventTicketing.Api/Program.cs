@@ -101,7 +101,7 @@ app.MapPost("/api/auth/login", async (LoginRequest request, AppDbContext db, ICo
 {
     if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
     {
-        return Results.BadRequest(new { error = "Invalid email or password" });
+        return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
     }
 
     var redisDb = redis.GetDatabase();
@@ -113,7 +113,7 @@ app.MapPost("/api/auth/login", async (LoginRequest request, AppDbContext db, ICo
     var lockTimeRemaining = await redisDb.KeyTimeToLiveAsync(lockKey);
     if (lockTimeRemaining.HasValue && lockTimeRemaining.Value.TotalSeconds > 0)
     {
-        return Results.Json(new { error = "Account is locked", remainingLockTimeSeconds = (int)lockTimeRemaining.Value.TotalSeconds }, statusCode: 403);
+        return Results.Json(new { message = "Account locked for 15 minutes" }, statusCode: 403);
     }
 
     var user = await db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
@@ -131,7 +131,7 @@ app.MapPost("/api/auth/login", async (LoginRequest request, AppDbContext db, ICo
             await redisDb.KeyDeleteAsync(attemptsKey);
         }
 
-        return Results.BadRequest(new { error = "Invalid email or password" });
+        return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
     }
 
     // On successful login, clear attempts
