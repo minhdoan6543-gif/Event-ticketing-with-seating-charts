@@ -1,7 +1,8 @@
 using EventTicketing.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-
+using StackExchange.Redis;
+using EventTicketing.Api.Security;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -83,7 +84,53 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+app.MapPost("/api/auth/login", async (LoginRequest request, AppDbContext db, IConnectionMultiplexer redis) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
+    {
+        return Results.BadRequest(new { error = "Invalid email or password" });
+    }
+
+    var redisDb = redis.GetDatabase();
+    var emailLower = request.Email.ToLowerInvariant();
+    var lockKey = $"lockout:{emailLower}";
+    var attemptsKey = $"attempts:{emailLower}";
+
+    // Check lockout status
+    var lockTimeRemaining = await redisDb.KeyTimeToLiveAsync(lockKey);
+    if (lockTimeRemaining.HasValue && lockTimeRemaining.Value.TotalSeconds > 0)
+    {
+        return Results.Json(new { error = "Account is locked", remainingLockTimeSeconds = (int)lockTimeRemaining.Value.TotalSeconds }, statusCode: 403);
+    }
+
+    var user = await db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
+    if (user == null || !PasswordHasher.VerifyPassword(user.PasswordHash, request.Password))
+    {
+        var attempts = await redisDb.StringIncrementAsync(attemptsKey);
+        if (attempts == 1)
+        {
+            await redisDb.KeyExpireAsync(attemptsKey, TimeSpan.FromMinutes(15));
+        }
+
+        if (attempts >= 5)
+        {
+            await redisDb.StringSetAsync(lockKey, "locked", TimeSpan.FromMinutes(15));
+            await redisDb.KeyDeleteAsync(attemptsKey);
+        }
+
+        return Results.BadRequest(new { error = "Invalid email or password" });
+    }
+
+    // On successful login, clear attempts
+    await redisDb.KeyDeleteAsync(attemptsKey);
+
+    return Results.Ok(new { message = "Login successful", userId = user.Id });
+})
+.WithName("Login");
+
 app.Run();
+
+public record LoginRequest(string Email, string Password);
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
