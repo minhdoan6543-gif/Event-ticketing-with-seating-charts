@@ -29,7 +29,7 @@ var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionStrin
 if (!string.IsNullOrEmpty(redisConnection))
 {
     redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", Environment.GetEnvironmentVariable("REDIS_CONNECTION"));
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => 
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
         StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
 }
 
