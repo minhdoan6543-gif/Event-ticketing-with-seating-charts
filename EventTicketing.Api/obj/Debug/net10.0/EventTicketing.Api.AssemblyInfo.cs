@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EventTicketing.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+06354dd066c552821f618bc7e3edf982c6e49129")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+66f8b5cf38de26d924f70cf7d96ed75e26d43ce0")]
 [assembly: System.Reflection.AssemblyProductAttribute("EventTicketing.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EventTicketing.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
