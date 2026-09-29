@@ -13,6 +13,7 @@
           "Microsoft.AspNetCore.OpenApi": "10.0.12",
           "Microsoft.EntityFrameworkCore.Design": "10.0.12",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.3",
+          "Scalar.AspNetCore": "2.17.10",
           "StackExchange.Redis": "3.3.1"
         },
         "runtime": {
@@ -542,6 +543,14 @@
           }
         }
       },
+      "Scalar.AspNetCore/2.17.10": {
+        "runtime": {
+          "lib/net10.0/Scalar.AspNetCore.dll": {
+            "assemblyVersion": "2.17.10.0",
+            "fileVersion": "2.17.10.0"
+          }
+        }
+      },
       "StackExchange.Redis/3.3.1": {
         "dependencies": {
           "RESPite": "3.3.1",
@@ -859,6 +868,13 @@
       "sha512": "sha512-1Ky6rOjP9YjA8eXWWSJDTSRgVQiRXwsKnET+X5hDuONJqq8KbYLQrTUjMg8gsdyKzwj74ivEioTuQd4mVhthdQ==",
       "path": "respite/3.3.1",
       "hashPath": "respite.3.3.1.nupkg.sha512"
+    },
+    "Scalar.AspNetCore/2.17.10": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-lASwa/do5YYLNp+EQ/LTfm9gxBykypyzQh52aJNYnYkMfFJDwsQ+W7+mKSFejfxA1jGaorFPSeUQHHslnBsdtA==",
+      "path": "scalar.aspnetcore/2.17.10",
+      "hashPath": "scalar.aspnetcore.2.17.10.nupkg.sha512"
     },
     "StackExchange.Redis/3.3.1": {
       "type": "package",

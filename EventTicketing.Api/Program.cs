@@ -48,10 +48,7 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference(options => 
-    {
-        options.EndpointPathPrefix = "/scalar/v1";
-    });
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
