@@ -107,8 +107,8 @@ app.MapGet("/weatherforecast", () =>
 .WithName("GetWeatherForecast");
 
 app.MapPost("/api/auth/login", async (
-    [Microsoft.AspNetCore.Mvc.FromBody] LoginRequest request, 
-    [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db, 
+    [Microsoft.AspNetCore.Mvc.FromBody] LoginRequest request,
+    [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db,
     [Microsoft.AspNetCore.Mvc.FromServices] IConnectionMultiplexer redis) =>
 {
     if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))

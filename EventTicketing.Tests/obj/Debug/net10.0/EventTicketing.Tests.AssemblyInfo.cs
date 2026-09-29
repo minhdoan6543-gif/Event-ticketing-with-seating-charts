@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EventTicketing.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+868ebf7832e298cc21c502f48651ddef6df0f8fb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+87a4877fc16c8dc1aa9d1f89f26d339fdf6e549b")]
 [assembly: System.Reflection.AssemblyProductAttribute("EventTicketing.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EventTicketing.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
