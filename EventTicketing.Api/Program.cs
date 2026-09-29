@@ -1,7 +1,8 @@
 using EventTicketing.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-
+using StackExchange.Redis;
+using EventTicketing.Api.Security;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -36,15 +37,35 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
                       ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
 
-if (!string.IsNullOrEmpty(redisConnection))
+if (string.IsNullOrEmpty(redisConnection) || redisConnection == "${REDIS_CONNECTION}")
 {
-    redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", Environment.GetEnvironmentVariable("REDIS_CONNECTION"));
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
-        StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
+    redisConnection = "localhost:6379";
 }
+else
+{
+    var envRedis = Environment.GetEnvironmentVariable("REDIS_CONNECTION");
+    if (!string.IsNullOrEmpty(envRedis))
+    {
+        redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", envRedis);
+    }
+}
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddHealthChecks();
 
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
 var app = builder.Build();
 
 // Automatically apply migrations at startup
@@ -57,12 +78,14 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 app.UseHttpsRedirection();
-app.MapHealthChecks("/health");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapHealthChecks("/health").AllowAnonymous();
 
 var summaries = new[]
 {
@@ -83,7 +106,62 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+app.MapPost("/api/auth/login", async (
+    [Microsoft.AspNetCore.Mvc.FromBody] LoginRequest request,
+    [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db,
+    [Microsoft.AspNetCore.Mvc.FromServices] IConnectionMultiplexer redis) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
+    {
+        return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
+    }
+
+    var redisDb = redis.GetDatabase();
+    var emailLower = request.Email.ToLowerInvariant();
+    var lockKey = $"lockout:{emailLower}";
+    var attemptsKey = $"attempts:{emailLower}";
+
+    // Check lockout status
+    var lockTimeRemaining = await redisDb.KeyTimeToLiveAsync(lockKey);
+    if (lockTimeRemaining.HasValue && lockTimeRemaining.Value.TotalSeconds > 0)
+    {
+        return Results.Json(new { message = "Account locked for 15 minutes" }, statusCode: 403);
+    }
+
+    var user = await db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
+    if (user == null)
+    {
+        return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
+    }
+
+    if (!PasswordHasher.VerifyPassword(user.PasswordHash, request.Password))
+    {
+        var attempts = await redisDb.StringIncrementAsync(attemptsKey);
+        if (attempts == 1)
+        {
+            await redisDb.KeyExpireAsync(attemptsKey, TimeSpan.FromMinutes(15));
+        }
+
+        if (attempts >= 5)
+        {
+            await redisDb.StringSetAsync(lockKey, "locked", TimeSpan.FromMinutes(15));
+            await redisDb.KeyDeleteAsync(attemptsKey);
+        }
+
+        return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
+    }
+
+    // On successful login, clear attempts
+    await redisDb.KeyDeleteAsync(attemptsKey);
+
+    return Results.Ok(new { message = "Login successful", userId = user.Id });
+})
+.WithName("Login")
+.AllowAnonymous();
+
 app.Run();
+
+public record LoginRequest(string Email, string Password);
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {

@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.PasswordHash).HasMaxLength(255);
         });
 
         modelBuilder.Entity<UserRole>(entity =>
@@ -44,14 +45,14 @@ public class AppDbContext : DbContext
             new Role { Id = 5, Name = "Admin" }
         );
 
-        // Seed Users (password_hash should be argon2id, for seed we can use a dummy hash or leave it for later proper generation)
+        // Seed Users
         modelBuilder.Entity<User>().HasData(
             new User
             {
                 Id = 1,
                 Email = "admin@example.com",
                 Name = "Admin User",
-                PasswordHash = "dummy_hash_for_now",
+                PasswordHash = "$argon2id$v=19$m=1024,t=4,p=1$e/uWMrsUacwSe+MinnJdvw$bfqciaQS7Vh7mbrj4O9AYaIAkcSDBCN1ZA907doLVZE",
                 Status = "Active",
                 CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
@@ -61,7 +62,7 @@ public class AppDbContext : DbContext
                 Id = 2,
                 Email = "organizer@example.com",
                 Name = "Organizer User",
-                PasswordHash = "dummy_hash_for_now",
+                PasswordHash = "$argon2id$v=19$m=1024,t=4,p=1$7+KlHvQH2yi4qnai3Yi8xQ$PSFx2iT05KnChgWgouh1MgopqXrt+QXOUF0hMhv8TW8",
                 Status = "Active",
                 CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
