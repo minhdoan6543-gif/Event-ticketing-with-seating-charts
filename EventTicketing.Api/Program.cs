@@ -120,7 +120,12 @@ app.MapPost("/api/auth/login", async (
     }
 
     var user = await db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
-    if (user == null || !PasswordHasher.VerifyPassword(user.PasswordHash, request.Password))
+    if (user == null)
+    {
+        return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
+    }
+
+    if (!PasswordHasher.VerifyPassword(user.PasswordHash, request.Password))
     {
         var attempts = await redisDb.StringIncrementAsync(attemptsKey);
         if (attempts == 1)
