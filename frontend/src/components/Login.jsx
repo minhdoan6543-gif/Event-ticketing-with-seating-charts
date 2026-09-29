@@ -7,11 +7,13 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     try {
       const response = await axiosClient.post('/auth/login', { email, password });
@@ -37,7 +39,13 @@ export default function Login() {
         setError('Login failed: No token received.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      if (err.response?.data?.error?.code === 'ACCOUNT_INACTIVE') {
+        setError('Account not activated. Please check your email for the activation link.');
+      } else {
+        setError(err.response?.data?.message || 'Invalid email or password');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -66,8 +74,8 @@ export default function Login() {
             style={{ width: '100%', padding: '8px' }}
           />
         </div>
-        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: '#fff', border: 'none' }}>
-          Login
+        <button type="submit" disabled={isLoading} style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: '#fff', border: 'none' }}>
+          {isLoading ? 'Logging in...' : 'Login'}
         </button>
       </form>
     </div>
