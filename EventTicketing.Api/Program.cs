@@ -1,12 +1,17 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using EventTicketing.Api.Data;
+using EventTicketing.Api.Entities;
+using EventTicketing.Api.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
-using EventTicketing.Api.Security;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -55,8 +60,19 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 
 builder.Services.AddHealthChecks();
 
+var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer();
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
 
 builder.Services.AddAuthorization(options =>
 {
@@ -66,6 +82,22 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "https://event-ticketing-with-seating-charts-1.onrender.com",
+                "https://event-ticketing-with-seating-charts.onrender.com",
+                "http://localhost:5173",
+                "http://localhost:3000"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
 // Automatically apply migrations at startup
@@ -83,6 +115,8 @@ if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
@@ -106,6 +140,40 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+app.MapPost("/api/auth/register", async (
+    [Microsoft.AspNetCore.Mvc.FromBody] RegisterRequest request,
+    [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
+    {
+        return Results.BadRequest(new { message = "Email and password are required" });
+    }
+
+    var emailLower = request.Email.Trim().ToLowerInvariant();
+    var existingUser = await db.Users.SingleOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+    if (existingUser != null)
+    {
+        return Results.BadRequest(new { message = "Email already registered" });
+    }
+
+    var newUser = new User
+    {
+        Email = emailLower,
+        Name = string.IsNullOrWhiteSpace(request.Name) ? "User" : request.Name.Trim(),
+        PasswordHash = PasswordHasher.HashPassword(request.Password),
+        Status = "Active",
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    db.Users.Add(newUser);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Registration successful" });
+})
+.WithName("Register")
+.AllowAnonymous();
+
 app.MapPost("/api/auth/login", async (
     [Microsoft.AspNetCore.Mvc.FromBody] LoginRequest request,
     [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db,
@@ -117,7 +185,7 @@ app.MapPost("/api/auth/login", async (
     }
 
     var redisDb = redis.GetDatabase();
-    var emailLower = request.Email.ToLowerInvariant();
+    var emailLower = request.Email.Trim().ToLowerInvariant();
     var lockKey = $"lockout:{emailLower}";
     var attemptsKey = $"attempts:{emailLower}";
 
@@ -128,10 +196,15 @@ app.MapPost("/api/auth/login", async (
         return Results.Json(new { message = "Account locked for 15 minutes" }, statusCode: 403);
     }
 
-    var user = await db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
+    var user = await db.Users.SingleOrDefaultAsync(u => u.Email.ToLower() == emailLower);
     if (user == null)
     {
         return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
+    }
+
+    if (user.Status == "Inactive")
+    {
+        return Results.Json(new { error = new { code = "ACCOUNT_INACTIVE", message = "Account not activated" } }, statusCode: 403);
     }
 
     if (!PasswordHasher.VerifyPassword(user.PasswordHash, request.Password))
@@ -154,12 +227,37 @@ app.MapPost("/api/auth/login", async (
     // On successful login, clear attempts
     await redisDb.KeyDeleteAsync(attemptsKey);
 
-    return Results.Ok(new { message = "Login successful", userId = user.Id });
+    var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
+    var securityKey = new SymmetricSecurityKey(keyBytes);
+    var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+    var claims = new[]
+    {
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Email, user.Email),
+        new Claim(ClaimTypes.Role, "Admin")
+    };
+
+    var tokenDescriptor = new JwtSecurityToken(
+        claims: claims,
+        expires: DateTime.UtcNow.AddHours(2),
+        signingCredentials: credentials);
+
+    var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+
+    return Results.Ok(new
+    {
+        message = "Login successful",
+        userId = user.Id,
+        token = tokenString
+    });
 })
 .WithName("Login")
 .AllowAnonymous();
 
 app.Run();
+
+public record RegisterRequest(string Email, string Name, string Password);
 
 public record LoginRequest(string Email, string Password);
 
