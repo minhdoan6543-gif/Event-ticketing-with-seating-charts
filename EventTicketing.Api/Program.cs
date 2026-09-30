@@ -1,7 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using EventTicketing.Api.Data;
+using EventTicketing.Api.SeatMaps;
 using EventTicketing.Api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -59,6 +62,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddHealthChecks();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<SeatMapImportService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
@@ -119,6 +124,95 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
+
+app.MapPut("/api/performances/{performanceId:int}/seat-map", async (
+    int performanceId,
+    IFormFile file,
+    SeatMapImportService importer,
+    CancellationToken cancellationToken) =>
+{
+    const long maximumFileSize = 10 * 1024 * 1024;
+
+    if (file.Length == 0)
+    {
+        return Results.BadRequest(new
+        {
+            code = "EMPTY_SEAT_MAP",
+            message = "The uploaded JSON file is empty."
+        });
+    }
+
+    if (file.Length > maximumFileSize)
+    {
+        return Results.BadRequest(new
+        {
+            code = "SEAT_MAP_TOO_LARGE",
+            message = "The uploaded JSON file cannot exceed 10 MB."
+        });
+    }
+
+    try
+    {
+        await using var stream = file.OpenReadStream();
+        var document = await JsonSerializer.DeserializeAsync<SeatMapImportDocument>(
+            stream,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+            },
+            cancellationToken);
+
+        if (document is null)
+        {
+            return Results.BadRequest(new
+            {
+                code = "INVALID_SEAT_MAP",
+                message = "The uploaded file does not contain a JSON object."
+            });
+        }
+
+        var result = await importer.ImportAsync(performanceId, document, cancellationToken);
+        return Results.Ok(new
+        {
+            result.SeatCount,
+            result.CreatedCategoryCount,
+            result.ReplacedExistingMap
+        });
+    }
+    catch (JsonException)
+    {
+        return Results.BadRequest(new
+        {
+            code = "INVALID_SEAT_MAP_JSON",
+            message = "The uploaded file is not valid seat-map JSON."
+        });
+    }
+    catch (SeatMapValidationException exception)
+    {
+        return Results.BadRequest(new
+        {
+            code = "INVALID_SEAT_MAP",
+            message = exception.Message,
+            errors = exception.Errors
+        });
+    }
+    catch (SeatMapReplacementBlockedException exception)
+    {
+        return Results.Json(new
+        {
+            code = "SEAT_MAP_REPLACEMENT_BLOCKED",
+            message = exception.Message,
+            soldSeats = exception.SoldSeats,
+            activeHolds = exception.ActiveHolds
+        }, statusCode: StatusCodes.Status409Conflict);
+    }
+})
+.DisableAntiforgery()
+.WithName("ImportSeatMap")
+.Accepts<IFormFile>("multipart/form-data")
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status409Conflict);
 
 var summaries = new[]
 {
