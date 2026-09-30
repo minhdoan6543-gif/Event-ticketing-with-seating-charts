@@ -6,6 +6,28 @@ namespace EventTicketing.Api.Security;
 
 public static class PasswordHasher
 {
+    public static string HashPassword(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        const int memorySize = 1024;
+        const int iterations = 4;
+        const int degreeOfParallelism = 1;
+
+        using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
+        {
+            Salt = salt,
+            DegreeOfParallelism = degreeOfParallelism,
+            Iterations = iterations,
+            MemorySize = memorySize
+        };
+
+        var hash = argon2.GetBytes(32);
+        var saltBase64 = Convert.ToBase64String(salt).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var hashBase64 = Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        return $"$argon2id$v=19$m={memorySize},t={iterations},p={degreeOfParallelism}${saltBase64}${hashBase64}";
+    }
+
     public static bool VerifyPassword(string phcHash, string password)
     {
         if (string.IsNullOrEmpty(phcHash) || !phcHash.StartsWith("$argon2id$"))
