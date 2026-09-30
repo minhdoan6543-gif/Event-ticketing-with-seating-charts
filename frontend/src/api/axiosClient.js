@@ -2,7 +2,7 @@ import axios from 'axios';
 import { router } from '../router.jsx';
 
 const axiosClient = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 axiosClient.interceptors.request.use((config) => {
