@@ -1,5 +1,5 @@
 import axiosClient from './axiosClient';
-import { EVENT_STATUS } from '../constants/eventStatus';
+import { EVENT_STATUS, SHOWTIME_STATUS } from '../constants/eventStatus';
 
 // ID của organizer hiện tại để mô phỏng phân quyền dữ liệu
 const CURRENT_ORGANIZER_ID = 'org-current';
@@ -65,24 +65,32 @@ const mockShowtimes = [
     eventId: 'evt-001',
     startTime: '2026-10-15T19:30',
     endTime: '2026-10-15T22:00',
+    status: SHOWTIME_STATUS.ON_SALE,
+    hasSeatMap: true,
   },
   {
     id: 'st-002',
     eventId: 'evt-001',
     startTime: '2026-10-16T19:30',
     endTime: '2026-10-16T22:00',
+    status: SHOWTIME_STATUS.DRAFT,
+    hasSeatMap: false,
   },
   {
     id: 'st-003',
     eventId: 'evt-002',
     startTime: '2026-11-05T08:00',
     endTime: '2026-11-05T17:00',
+    status: SHOWTIME_STATUS.DRAFT,
+    hasSeatMap: true,
   },
   {
     id: 'st-004',
     eventId: 'evt-003',
     startTime: '2026-10-20T20:00',
     endTime: '2026-10-20T22:30',
+    status: SHOWTIME_STATUS.CLOSED,
+    hasSeatMap: true,
   },
 ];
 
@@ -198,6 +206,8 @@ export const createShowtime = async (eventId, data) => {
         eventId,
         startTime: data.startTime,
         endTime: data.endTime || null,
+        status: SHOWTIME_STATUS.DRAFT,
+        hasSeatMap: false,
       };
 
       mockShowtimes.push(newShowtime);
@@ -210,5 +220,30 @@ export const createShowtime = async (eventId, data) => {
 
       resolve({ ...newShowtime });
     }, 500);
+  });
+};
+
+// ========================================================
+// SCRUM-86 & 87: HÀM MỞ BÁN / ĐÓNG BÁN VỚI KIỂM TRA SƠ ĐỒ GHẾ
+// ========================================================
+export const updateShowtimeSalesStatus = async (showtimeId, newStatus) => {
+  if (!axiosClient) throw new Error('axiosClient is not initialized');
+
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const showtime = mockShowtimes.find((s) => s.id === showtimeId);
+      if (!showtime) {
+        return reject(new Error('Suất diễn không tồn tại!'));
+      }
+
+      // KỊCH BẢN CHẶN: Nếu bấm Mở bán mà chưa có sơ đồ ghế -> Chặn kèm lý do
+      if (newStatus === SHOWTIME_STATUS.ON_SALE && !showtime.hasSeatMap) {
+        return reject(new Error('Suất diễn chưa có sơ đồ ghế! Vui lòng thiết lập sơ đồ ghế trước khi mở bán.'));
+      }
+
+      // Đổi trạng thái (chuyển đổi qua lại linh hoạt giữa Đang bán và Đóng bán)
+      showtime.status = newStatus;
+      resolve({ ...showtime });
+    }, 300);
   });
 };
