@@ -12,6 +12,8 @@ public class AppDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
+    public DbSet<Seat> Seats { get; set; }
+    public DbSet<SeatCategory> SeatCategories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +36,48 @@ public class AppDbContext : DbContext
             entity.HasOne(ur => ur.Role)
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(ur => ur.RoleId);
+        });
+
+        modelBuilder.Entity<SeatCategory>(entity =>
+        {
+            entity.ToTable("seat_categories");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.PerformanceId).HasColumnName("performance_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(100);
+            entity.Property(e => e.NormalizedName).HasColumnName("normalized_name").HasMaxLength(100);
+            entity.HasAlternateKey(e => new { e.PerformanceId, e.Id });
+            entity.HasIndex(e => new { e.PerformanceId, e.NormalizedName }).IsUnique();
+        });
+
+        modelBuilder.Entity<Seat>(entity =>
+        {
+            entity.ToTable("seats", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_seats_hold_fields",
+                    "status <> 'HELD' OR (held_by_user_id IS NOT NULL AND held_until IS NOT NULL)");
+            });
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.PerformanceId).HasColumnName("performance_id");
+            entity.Property(e => e.SeatCategoryId).HasColumnName("seat_category_id");
+            entity.Property(e => e.Row).HasColumnName("row").HasMaxLength(50);
+            entity.Property(e => e.Number).HasColumnName("number").HasMaxLength(50);
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion(
+                    status => status.ToString().ToUpperInvariant(),
+                    value => Enum.Parse<SeatStatus>(value, true))
+                .HasMaxLength(20);
+            entity.Property(e => e.HeldByUserId).HasColumnName("held_by_user_id");
+            entity.Property(e => e.HeldUntil).HasColumnName("held_until");
+            entity.HasIndex(e => new { e.PerformanceId, e.Row, e.Number }).IsUnique();
+            entity.HasIndex(e => new { e.PerformanceId, e.Status, e.HeldUntil });
+
+            entity.HasOne(e => e.SeatCategory)
+                .WithMany(category => category.Seats)
+                .HasForeignKey(e => new { e.PerformanceId, e.SeatCategoryId })
+                .HasPrincipalKey(category => new { category.PerformanceId, category.Id })
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Seed Roles
