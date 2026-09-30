@@ -15,8 +15,11 @@ function App() {
 
   return (
     <div className="App">
-      <header style={{ padding: '10px', borderBottom: '1px solid #ccc', display: 'flex', gap: '15px' }}>
+      <header style={{ padding: '10px', borderBottom: '1px solid #ccc', display: 'flex', gap: '15px', alignItems: 'center' }}>
         <Link to="/">Home</Link>
+        <RequireRole allowedRoles={['Admin', 'Organizer']}>
+          <Link to="/events">Sự kiện</Link>
+        </RequireRole>
         {!token ? (
           <Link to="/login">Login</Link>
         ) : (
