@@ -8,10 +8,13 @@ public static class PasswordHasher
 {
     public static string HashPassword(string password)
     {
-        var salt = RandomNumberGenerator.GetBytes(16);
         const int memorySize = 1024;
         const int iterations = 4;
         const int degreeOfParallelism = 1;
+        const int saltSize = 16;
+        const int hashSize = 32;
+
+        var salt = RandomNumberGenerator.GetBytes(saltSize);
 
         using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
         {
@@ -21,11 +24,12 @@ public static class PasswordHasher
             MemorySize = memorySize
         };
 
-        var hash = argon2.GetBytes(32);
-        var saltBase64 = Convert.ToBase64String(salt).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        var hashBase64 = Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var hash = argon2.GetBytes(hashSize);
 
-        return $"$argon2id$v=19$m={memorySize},t={iterations},p={degreeOfParallelism}${saltBase64}${hashBase64}";
+        var saltString = EncodeBase64Url(salt);
+        var hashString = EncodeBase64Url(hash);
+
+        return $"$argon2id$v=19$m={memorySize},t={iterations},p={degreeOfParallelism}${saltString}${hashString}";
     }
 
     public static bool VerifyPassword(string phcHash, string password)
@@ -65,6 +69,14 @@ public static class PasswordHasher
         var actualHash = argon2.GetBytes(expectedHash.Length);
 
         return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+    }
+
+    private static string EncodeBase64Url(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 
     private static byte[] DecodeBase64Url(string base64)
