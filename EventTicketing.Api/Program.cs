@@ -3,6 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using EventTicketing.Api.Security;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -55,8 +59,19 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 
 builder.Services.AddHealthChecks();
 
+var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer();
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
 
 builder.Services.AddAuthorization(options =>
 {
@@ -71,7 +86,12 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", policy =>
     {
         policy
-            .WithOrigins("https://event-ticketing-with-seating-charts-1.onrender.com")
+            .WithOrigins(
+                "https://event-ticketing-with-seating-charts-1.onrender.com",
+                "https://event-ticketing-with-seating-charts.onrender.com",
+                "http://localhost:5173",
+                "http://localhost:3000"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -163,10 +183,33 @@ app.MapPost("/api/auth/login", async (
         return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
     }
 
-    // On successful login, clear attempts
+   // On successful login, clear attempts
     await redisDb.KeyDeleteAsync(attemptsKey);
 
-    return Results.Ok(new { message = "Login successful", userId = user.Id });
+    // Tạo JWT token trả về cho Frontend
+    var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
+    var securityKey = new SymmetricSecurityKey(keyBytes);
+    var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+    var claims = new[]
+    {
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Email, user.Email),
+        new Claim(ClaimTypes.Role, "Customer") 
+    };
+
+    var tokenDescriptor = new JwtSecurityToken(
+        claims: claims,
+        expires: DateTime.UtcNow.AddHours(2),
+        signingCredentials: credentials);
+
+    var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+
+    return Results.Ok(new { 
+        message = "Login successful", 
+        userId = user.Id,
+        token = tokenString 
+    });
 })
 .WithName("Login")
 .AllowAnonymous();
