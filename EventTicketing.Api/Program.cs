@@ -1,10 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using EventTicketing.Api.Data;
-using EventTicketing.Api.SeatMaps;
+using EventTicketing.Api.Entities;
 using EventTicketing.Api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -14,7 +12,6 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -62,8 +59,6 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddHealthChecks();
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<SeatMapImportService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
@@ -102,6 +97,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
 var app = builder.Build();
 
 // Automatically apply migrations at startup
@@ -125,95 +121,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
 
-app.MapPut("/api/performances/{performanceId:int}/seat-map", async (
-    int performanceId,
-    IFormFile file,
-    SeatMapImportService importer,
-    CancellationToken cancellationToken) =>
-{
-    const long maximumFileSize = 10 * 1024 * 1024;
-
-    if (file.Length == 0)
-    {
-        return Results.BadRequest(new
-        {
-            code = "EMPTY_SEAT_MAP",
-            message = "The uploaded JSON file is empty."
-        });
-    }
-
-    if (file.Length > maximumFileSize)
-    {
-        return Results.BadRequest(new
-        {
-            code = "SEAT_MAP_TOO_LARGE",
-            message = "The uploaded JSON file cannot exceed 10 MB."
-        });
-    }
-
-    try
-    {
-        await using var stream = file.OpenReadStream();
-        var document = await JsonSerializer.DeserializeAsync<SeatMapImportDocument>(
-            stream,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web)
-            {
-                UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
-            },
-            cancellationToken);
-
-        if (document is null)
-        {
-            return Results.BadRequest(new
-            {
-                code = "INVALID_SEAT_MAP",
-                message = "The uploaded file does not contain a JSON object."
-            });
-        }
-
-        var result = await importer.ImportAsync(performanceId, document, cancellationToken);
-        return Results.Ok(new
-        {
-            result.SeatCount,
-            result.CreatedCategoryCount,
-            result.ReplacedExistingMap
-        });
-    }
-    catch (JsonException)
-    {
-        return Results.BadRequest(new
-        {
-            code = "INVALID_SEAT_MAP_JSON",
-            message = "The uploaded file is not valid seat-map JSON."
-        });
-    }
-    catch (SeatMapValidationException exception)
-    {
-        return Results.BadRequest(new
-        {
-            code = "INVALID_SEAT_MAP",
-            message = exception.Message,
-            errors = exception.Errors
-        });
-    }
-    catch (SeatMapReplacementBlockedException exception)
-    {
-        return Results.Json(new
-        {
-            code = "SEAT_MAP_REPLACEMENT_BLOCKED",
-            message = exception.Message,
-            soldSeats = exception.SoldSeats,
-            activeHolds = exception.ActiveHolds
-        }, statusCode: StatusCodes.Status409Conflict);
-    }
-})
-.DisableAntiforgery()
-.WithName("ImportSeatMap")
-.Accepts<IFormFile>("multipart/form-data")
-.Produces(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status409Conflict);
-
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
@@ -233,6 +140,40 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+app.MapPost("/api/auth/register", async (
+    [Microsoft.AspNetCore.Mvc.FromBody] RegisterRequest request,
+    [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
+    {
+        return Results.BadRequest(new { message = "Email and password are required" });
+    }
+
+    var emailLower = request.Email.Trim().ToLowerInvariant();
+    var existingUser = await db.Users.SingleOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+    if (existingUser != null)
+    {
+        return Results.BadRequest(new { message = "Email already registered" });
+    }
+
+    var newUser = new User
+    {
+        Email = emailLower,
+        Name = string.IsNullOrWhiteSpace(request.Name) ? "User" : request.Name.Trim(),
+        PasswordHash = PasswordHasher.HashPassword(request.Password),
+        Status = "Active",
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    db.Users.Add(newUser);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Registration successful" });
+})
+.WithName("Register")
+.AllowAnonymous();
+
 app.MapPost("/api/auth/login", async (
     [Microsoft.AspNetCore.Mvc.FromBody] LoginRequest request,
     [Microsoft.AspNetCore.Mvc.FromServices] AppDbContext db,
@@ -244,7 +185,7 @@ app.MapPost("/api/auth/login", async (
     }
 
     var redisDb = redis.GetDatabase();
-    var emailLower = request.Email.ToLowerInvariant();
+    var emailLower = request.Email.Trim().ToLowerInvariant();
     var lockKey = $"lockout:{emailLower}";
     var attemptsKey = $"attempts:{emailLower}";
 
@@ -255,10 +196,15 @@ app.MapPost("/api/auth/login", async (
         return Results.Json(new { message = "Account locked for 15 minutes" }, statusCode: 403);
     }
 
-    var user = await db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
+    var user = await db.Users.SingleOrDefaultAsync(u => u.Email.ToLower() == emailLower);
     if (user == null)
     {
         return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
+    }
+
+    if (user.Status == "Inactive")
+    {
+        return Results.Json(new { error = new { code = "ACCOUNT_INACTIVE", message = "Account not activated" } }, statusCode: 403);
     }
 
     if (!PasswordHasher.VerifyPassword(user.PasswordHash, request.Password))
@@ -289,7 +235,7 @@ app.MapPost("/api/auth/login", async (
     {
         new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
         new Claim(ClaimTypes.Email, user.Email),
-        new Claim(ClaimTypes.Role, "Customer")
+        new Claim(ClaimTypes.Role, "Admin")
     };
 
     var tokenDescriptor = new JwtSecurityToken(
@@ -310,6 +256,8 @@ app.MapPost("/api/auth/login", async (
 .AllowAnonymous();
 
 app.Run();
+
+public record RegisterRequest(string Email, string Name, string Password);
 
 public record LoginRequest(string Email, string Password);
 
