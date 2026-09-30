@@ -59,11 +59,17 @@ export default function EventList() {
           marginBottom: '24px',
           flexWrap: 'wrap',
           gap: '12px',
+          backgroundColor: 'var(--code-bg, #1f2028)',
+          padding: '16px 20px',
+          borderRadius: '8px',
+          border: '1px solid var(--border, #2e303a)',
         }}
       >
-        <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: '24px', color: '#111827' }}>Danh Sách Sự Kiện</h2>
-          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h2 style={{ margin: '0 0 4px 0', fontSize: '24px', color: 'var(--text-h, #f1f5f9)', fontWeight: '600' }}>
+            Danh Sách Sự Kiện
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text, #9ca3af)', fontSize: '14px' }}>
             Quản lý các sự kiện, suất diễn và theo dõi trạng thái mở bán
           </p>
         </div>
@@ -93,13 +99,15 @@ export default function EventList() {
           style={{
             padding: '48px 16px',
             textAlign: 'center',
-            backgroundColor: '#f8fafc',
+            backgroundColor: 'var(--code-bg, #1f2028)',
             borderRadius: '8px',
-            border: '1px dashed #cbd5e1',
-            color: '#64748b',
+            border: '1px dashed var(--border, #2e303a)',
+            color: 'var(--text, #9ca3af)',
           }}
         >
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Đang tải danh sách sự kiện...</div>
+          <div style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-h, #f1f5f9)' }}>
+            Đang tải danh sách sự kiện...
+          </div>
         </div>
       )}
 
@@ -139,14 +147,16 @@ export default function EventList() {
           style={{
             padding: '48px 16px',
             textAlign: 'center',
-            backgroundColor: '#f9fafb',
+            backgroundColor: 'var(--code-bg, #1f2028)',
             borderRadius: '8px',
-            border: '1px dashed #d1d5db',
-            color: '#6b7280',
+            border: '1px dashed var(--border, #2e303a)',
+            color: 'var(--text, #9ca3af)',
           }}
         >
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#374151' }}>Chưa có sự kiện nào</h4>
-          <p style={{ margin: '0 0 16px 0', fontSize: '14px' }}>
+          <h4 style={{ margin: '0 0 8px 0', fontSize: '18px', color: 'var(--text-h, #f1f5f9)' }}>
+            Chưa có sự kiện nào
+          </h4>
+          <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text, #9ca3af)' }}>
             Hệ thống chưa ghi nhận sự kiện nào. Bạn có thể bắt đầu tạo sự kiện đầu tiên ngay bây giờ.
           </p>
           <Link
@@ -184,19 +194,20 @@ export default function EventList() {
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  backgroundColor: '#ffffff',
+                  backgroundColor: 'var(--code-bg, #1f2028)',
                   borderRadius: '10px',
-                  border: '1px solid #e5e7eb',
+                  border: '1px solid var(--border, #2e303a)',
                   overflow: 'hidden',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                   textDecoration: 'none',
                   color: 'inherit',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   cursor: 'pointer',
+                  textAlign: 'left',
                 }}
               >
                 {/* Event Image */}
-                <div style={{ height: '170px', width: '100%', overflow: 'hidden', backgroundColor: '#f1f5f9', position: 'relative' }}>
+                <div style={{ height: '170px', width: '100%', overflow: 'hidden', backgroundColor: 'var(--bg, #16171d)', position: 'relative' }}>
                   <img
                     src={evt.imageUrl}
                     alt={evt.name}
@@ -228,7 +239,7 @@ export default function EventList() {
                       margin: '0 0 8px 0',
                       fontSize: '17px',
                       fontWeight: '600',
-                      color: '#111827',
+                      color: 'var(--text-h, #f1f5f9)',
                       lineHeight: '1.4',
                     }}
                   >
@@ -239,7 +250,7 @@ export default function EventList() {
                     style={{
                       margin: '0 0 12px 0',
                       fontSize: '13px',
-                      color: '#6b7280',
+                      color: 'var(--text, #9ca3af)',
                       lineHeight: '1.5',
                       flex: '1',
                     }}
@@ -247,20 +258,21 @@ export default function EventList() {
                     {evt.description}
                   </p>
 
-                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '12px', fontSize: '13px', color: '#4b5563' }}>
+                  <div style={{ borderTop: '1px solid var(--border, #2e303a)', paddingTop: '12px', fontSize: '13px' }}>
                     <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                      <span style={{ fontWeight: '500', minWidth: '65px' }}>Địa điểm:</span>
-                      <span style={{ color: '#1f2937' }}>{evt.location}</span>
+                      <span style={{ fontWeight: '500', minWidth: '65px', color: 'var(--text-h, #f1f5f9)' }}>Địa điểm:</span>
+                      <span style={{ color: 'var(--text, #9ca3af)' }}>{evt.location}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontWeight: '500', minWidth: '65px' }}>Suất diễn:</span>
+                      <span style={{ fontWeight: '500', minWidth: '65px', color: 'var(--text-h, #f1f5f9)' }}>Suất diễn:</span>
                       <span
                         style={{
-                          backgroundColor: '#f1f5f9',
+                          backgroundColor: 'var(--bg, #16171d)',
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontWeight: '600',
-                          color: '#0f172a',
+                          color: 'var(--text-h, #f1f5f9)',
+                          border: '1px solid var(--border, #2e303a)',
                         }}
                       >
                         {evt.showCount} suất

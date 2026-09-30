@@ -62,11 +62,24 @@ export default function CreateEvent() {
   };
 
   return (
-    <div style={{ maxWidth: '640px', margin: '30px auto', padding: '24px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+    <div
+      style={{
+        maxWidth: '640px',
+        margin: '30px auto',
+        padding: '24px',
+        backgroundColor: 'var(--code-bg, #1f2028)',
+        borderRadius: '8px',
+        border: '1px solid var(--border, #2e303a)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        textAlign: 'left',
+      }}
+    >
       {/* Header */}
-      <div style={{ marginBottom: '20px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
-        <h2 style={{ margin: '0 0 6px 0', fontSize: '22px', color: '#111827' }}>Tạo Sự Kiện Mới</h2>
-        <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
+      <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--border, #2e303a)', paddingBottom: '12px' }}>
+        <h2 style={{ margin: '0 0 6px 0', fontSize: '22px', color: 'var(--text-h, #f1f5f9)', fontWeight: '600' }}>
+          Tạo Sự Kiện Mới
+        </h2>
+        <p style={{ margin: 0, fontSize: '14px', color: 'var(--text, #9ca3af)' }}>
           Nhập các thông tin cơ bản của sự kiện. Sự kiện mới sẽ được lưu dưới dạng <strong>Bản nháp</strong>.
         </p>
       </div>
@@ -80,7 +93,7 @@ export default function CreateEvent() {
       <form onSubmit={handleSubmit} noValidate>
         {/* Tên sự kiện */}
         <div style={{ marginBottom: '18px' }}>
-          <label htmlFor="name" style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: '#374151' }}>
+          <label htmlFor="name" style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: 'var(--text-h, #f1f5f9)' }}>
             Tên sự kiện <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
@@ -95,11 +108,12 @@ export default function CreateEvent() {
               width: '100%',
               padding: '10px 12px',
               borderRadius: '6px',
-              border: `1px solid ${errors.name ? '#ef4444' : '#d1d5db'}`,
+              border: `1px solid ${errors.name ? '#ef4444' : 'var(--border, #475569)'}`,
               outline: 'none',
               fontSize: '14px',
               boxSizing: 'border-box',
-              backgroundColor: isSubmitting ? '#f9fafb' : '#ffffff',
+              backgroundColor: isSubmitting ? 'var(--code-bg, #1f2028)' : 'var(--bg, #16171d)',
+              color: 'var(--text-h, #f1f5f9)',
             }}
           />
           {errors.name && (
@@ -111,7 +125,7 @@ export default function CreateEvent() {
 
         {/* Địa điểm */}
         <div style={{ marginBottom: '18px' }}>
-          <label htmlFor="location" style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: '#374151' }}>
+          <label htmlFor="location" style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: 'var(--text-h, #f1f5f9)' }}>
             Địa điểm tổ chức <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
@@ -126,11 +140,12 @@ export default function CreateEvent() {
               width: '100%',
               padding: '10px 12px',
               borderRadius: '6px',
-              border: `1px solid ${errors.location ? '#ef4444' : '#d1d5db'}`,
+              border: `1px solid ${errors.location ? '#ef4444' : 'var(--border, #475569)'}`,
               outline: 'none',
               fontSize: '14px',
               boxSizing: 'border-box',
-              backgroundColor: isSubmitting ? '#f9fafb' : '#ffffff',
+              backgroundColor: isSubmitting ? 'var(--code-bg, #1f2028)' : 'var(--bg, #16171d)',
+              color: 'var(--text-h, #f1f5f9)',
             }}
           />
           {errors.location && (
@@ -142,7 +157,7 @@ export default function CreateEvent() {
 
         {/* Mô tả */}
         <div style={{ marginBottom: '24px' }}>
-          <label htmlFor="description" style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: '#374151' }}>
+          <label htmlFor="description" style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: 'var(--text-h, #f1f5f9)' }}>
             Mô tả sự kiện <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <textarea
@@ -157,12 +172,13 @@ export default function CreateEvent() {
               width: '100%',
               padding: '10px 12px',
               borderRadius: '6px',
-              border: `1px solid ${errors.description ? '#ef4444' : '#d1d5db'}`,
+              border: `1px solid ${errors.description ? '#ef4444' : 'var(--border, #475569)'}`,
               outline: 'none',
               fontSize: '14px',
               boxSizing: 'border-box',
               resize: 'vertical',
-              backgroundColor: isSubmitting ? '#f9fafb' : '#ffffff',
+              backgroundColor: isSubmitting ? 'var(--code-bg, #1f2028)' : 'var(--bg, #16171d)',
+              color: 'var(--text-h, #f1f5f9)',
             }}
           />
           {errors.description && (
@@ -179,9 +195,9 @@ export default function CreateEvent() {
             style={{
               padding: '10px 18px',
               borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              backgroundColor: '#ffffff',
-              color: '#374151',
+              border: '1px solid var(--border, #475569)',
+              backgroundColor: 'var(--bg, #16171d)',
+              color: 'var(--text-h, #f1f5f9)',
               textDecoration: 'none',
               fontSize: '14px',
               fontWeight: '500',
