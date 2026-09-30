@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getEventById, getShowtimes } from '../api/eventsApi';
-import { EVENT_STATUS, getEventStatusInfo } from '../constants/eventStatus';
+import { getEventById, getShowtimes, updateShowtimeSalesStatus } from '../api/eventsApi';
+import { EVENT_STATUS, getEventStatusInfo, SHOWTIME_STATUS, getShowtimeStatusInfo } from '../constants/eventStatus';
 import ShowtimeForm from './ShowtimeForm';
 
 const formatDateTime = (isoString) => {
@@ -25,6 +25,38 @@ export default function EventDetail() {
   const [showtimes, setShowtimes] = useState([]);
   const [loadingShowtimes, setLoadingShowtimes] = useState(true);
   const [showtimesError, setShowtimesError] = useState(null);
+
+  // SCRUM-86 & 87: Quản lý trạng thái Mở bán / Đóng bán
+  const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  const handleToggleSales = async (showtime) => {
+    setActionError(null);
+    setActionSuccess(null);
+    setActionLoadingId(showtime.id);
+
+    try {
+      const newStatus =
+        showtime.status === SHOWTIME_STATUS.ON_SALE
+          ? SHOWTIME_STATUS.CLOSED
+          : SHOWTIME_STATUS.ON_SALE;
+
+      const updated = await updateShowtimeSalesStatus(showtime.id, newStatus);
+      setShowtimes((prev) =>
+        prev.map((s) => (s.id === showtime.id ? { ...s, status: updated.status } : s))
+      );
+      setActionSuccess(
+        newStatus === SHOWTIME_STATUS.ON_SALE
+          ? 'Đã mở bán thành công suất diễn!'
+          : 'Đã đóng bán suất diễn thành công!'
+      );
+    } catch (err) {
+      setActionError(err?.message || 'Có lỗi xảy ra khi đổi trạng thái');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   const fetchShowtimes = () => {
     setLoadingShowtimes(true);
@@ -265,6 +297,57 @@ export default function EventDetail() {
           </span>
         </div>
 
+        {/* Thông báo lỗi / thành công khi đổi trạng thái mở/đóng bán */}
+        {actionError && (
+          <div
+            style={{
+              padding: '12px 16px',
+              marginBottom: '16px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '6px',
+              color: '#b91c1c',
+              fontSize: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>⚠️ {actionError}</span>
+            <button
+              onClick={() => setActionError(null)}
+              style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {actionSuccess && (
+          <div
+            style={{
+              padding: '12px 16px',
+              marginBottom: '16px',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '6px',
+              color: '#15803d',
+              fontSize: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>✓ {actionSuccess}</span>
+            <button
+              onClick={() => setActionSuccess(null)}
+              style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Loading suất diễn */}
         {loadingShowtimes && (
           <div
@@ -383,20 +466,62 @@ export default function EventDetail() {
                     </div>
                   </div>
 
-                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    {/* SCRUM-86: Cột Trạng thái Suất diễn */}
                     <span
                       style={{
-                        padding: '3px 10px',
+                        padding: '4px 12px',
                         borderRadius: '12px',
                         fontSize: '12px',
-                        fontWeight: '500',
-                        backgroundColor: 'var(--code-bg, #1f2028)',
-                        color: 'var(--text-h, #f1f5f9)',
-                        border: '1px solid var(--border, #2e303a)',
+                        fontWeight: '600',
+                        ...getShowtimeStatusInfo(s.status).style,
                       }}
                     >
-                      Suất #{idx + 1}
+                      {getShowtimeStatusInfo(s.status).label}
                     </span>
+
+                    {/* Hiển thị trạng thái Sơ đồ ghế */}
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: s.hasSeatMap ? '#22c55e' : '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {s.hasSeatMap ? '✓ Đã có sơ đồ ghế' : '⚠ Chưa có sơ đồ'}
+                    </span>
+
+                    {/* SCRUM-87: Nút Mở bán / Đóng bán */}
+                    <button
+                      onClick={() => handleToggleSales(s)}
+                      disabled={actionLoadingId === s.id}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: actionLoadingId === s.id ? 'not-allowed' : 'pointer',
+                        border: 'none',
+                        backgroundColor:
+                          s.status === SHOWTIME_STATUS.ON_SALE
+                            ? '#dc2626'
+                            : '#16a34a',
+                        color: '#ffffff',
+                        transition: 'background-color 0.2s, opacity 0.2s',
+                        opacity: actionLoadingId === s.id ? 0.6 : 1,
+                      }}
+                    >
+                      {actionLoadingId === s.id
+                        ? 'Đang xử lý...'
+                        : s.status === SHOWTIME_STATUS.ON_SALE
+                        ? 'Đóng bán'
+                        : s.status === SHOWTIME_STATUS.CLOSED
+                        ? 'Mở lại'
+                        : 'Mở bán'}
+                    </button>
                   </div>
                 </div>
               );
