@@ -1,12 +1,13 @@
-using EventTicketing.Api.Data;
-using Microsoft.EntityFrameworkCore;
-using Scalar.AspNetCore;
-using StackExchange.Redis;
-using EventTicketing.Api.Security;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using EventTicketing.Api.Data;
+using EventTicketing.Api.Security;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
+using StackExchange.Redis;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -183,10 +184,9 @@ app.MapPost("/api/auth/login", async (
         return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
     }
 
-   // On successful login, clear attempts
+    // On successful login, clear attempts
     await redisDb.KeyDeleteAsync(attemptsKey);
 
-    // Tạo JWT token trả về cho Frontend
     var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
     var securityKey = new SymmetricSecurityKey(keyBytes);
     var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -195,7 +195,7 @@ app.MapPost("/api/auth/login", async (
     {
         new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
         new Claim(ClaimTypes.Email, user.Email),
-        new Claim(ClaimTypes.Role, "Customer") 
+        new Claim(ClaimTypes.Role, "Customer")
     };
 
     var tokenDescriptor = new JwtSecurityToken(
@@ -205,10 +205,11 @@ app.MapPost("/api/auth/login", async (
 
     var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
 
-    return Results.Ok(new { 
-        message = "Login successful", 
+    return Results.Ok(new
+    {
+        message = "Login successful",
         userId = user.Id,
-        token = tokenString 
+        token = tokenString
     });
 })
 .WithName("Login")
