@@ -1,7 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getEventById } from '../api/eventsApi';
+import { getEventById, getShowtimes } from '../api/eventsApi';
 import { EVENT_STATUS, getEventStatusInfo } from '../constants/eventStatus';
+import ShowtimeForm from './ShowtimeForm';
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  return d.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
 
 export default function EventDetail() {
   const { id } = useParams();
@@ -9,9 +22,29 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [showtimes, setShowtimes] = useState([]);
+  const [loadingShowtimes, setLoadingShowtimes] = useState(true);
+  const [showtimesError, setShowtimesError] = useState(null);
+
+  const fetchShowtimes = () => {
+    setLoadingShowtimes(true);
+    setShowtimesError(null);
+    getShowtimes(id)
+      .then((data) => {
+        setShowtimes(data);
+      })
+      .catch((err) => {
+        setShowtimesError(err?.message || 'Có lỗi xảy ra khi tải danh sách suất diễn.');
+      })
+      .finally(() => {
+        setLoadingShowtimes(false);
+      });
+  };
+
   useEffect(() => {
     let ignore = false;
 
+    // Tải thông tin sự kiện
     getEventById(id)
       .then((data) => {
         if (!ignore) {
@@ -26,6 +59,24 @@ export default function EventDetail() {
       .finally(() => {
         if (!ignore) {
           setLoading(false);
+        }
+      });
+
+    // Tải danh sách suất diễn
+    getShowtimes(id)
+      .then((data) => {
+        if (!ignore) {
+          setShowtimes(data);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setShowtimesError(err?.message || 'Có lỗi xảy ra khi tải danh sách suất diễn.');
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoadingShowtimes(false);
         }
       });
 
@@ -92,6 +143,11 @@ export default function EventDetail() {
 
   const statusInfo = getEventStatusInfo(event.status);
   const isDraft = event.status === EVENT_STATUS.DRAFT;
+
+  // Sắp xếp suất diễn tăng dần theo thời gian bắt đầu
+  const sortedShowtimes = [...showtimes].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
 
   return (
     <div
@@ -192,7 +248,7 @@ export default function EventDetail() {
         </p>
       </div>
 
-      {/* Placeholder Suất diễn section for next step */}
+      {/* Phân hệ Suất diễn */}
       <div
         style={{
           borderTop: '2px dashed var(--border, #2e303a)',
@@ -200,31 +256,162 @@ export default function EventDetail() {
           marginTop: '24px',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-h, #f1f5f9)', fontWeight: '600' }}>
-            Suất diễn
+            Danh Sách Suất Diễn ({sortedShowtimes.length})
           </h3>
-          <span style={{ fontSize: '12px', color: 'var(--text, #9ca3af)', fontStyle: 'italic' }}>
-            (Phân hệ quản lý lịch &amp; khung giờ)
+          <span style={{ fontSize: '12px', color: 'var(--text, #9ca3af)' }}>
+            Sắp xếp theo thứ tự thời gian tăng dần
           </span>
         </div>
-        <div
-          style={{
-            padding: '36px 16px',
-            backgroundColor: 'var(--bg, #16171d)',
-            border: '1px solid var(--border, #2e303a)',
-            borderRadius: '6px',
-            textAlign: 'center',
-            color: 'var(--text, #9ca3af)',
-          }}
-        >
-          <div style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-h, #f1f5f9)', marginBottom: '4px' }}>
-            Sẽ làm ở bước sau
+
+        {/* Loading suất diễn */}
+        {loadingShowtimes && (
+          <div
+            style={{
+              padding: '24px',
+              textAlign: 'center',
+              backgroundColor: 'var(--bg, #16171d)',
+              border: '1px dashed var(--border, #2e303a)',
+              borderRadius: '6px',
+              color: 'var(--text, #9ca3af)',
+              fontSize: '14px',
+            }}
+          >
+            Đang tải danh sách suất diễn...
           </div>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text, #9ca3af)' }}>
-            Khu vực cấu hình thời gian bắt đầu, kết thúc, hạng vé và sơ đồ ghế cho từng suất diễn.
-          </p>
-        </div>
+        )}
+
+        {/* Lỗi tải suất diễn */}
+        {!loadingShowtimes && showtimesError && (
+          <div
+            style={{
+              padding: '16px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '6px',
+              color: '#b91c1c',
+              fontSize: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{showtimesError}</span>
+            <button
+              onClick={fetchShowtimes}
+              style={{
+                padding: '4px 10px',
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {/* Trạng thái trống */}
+        {!loadingShowtimes && !showtimesError && sortedShowtimes.length === 0 && (
+          <div
+            style={{
+              padding: '30px 16px',
+              backgroundColor: 'var(--bg, #16171d)',
+              border: '1px dashed var(--border, #2e303a)',
+              borderRadius: '6px',
+              textAlign: 'center',
+              color: 'var(--text, #9ca3af)',
+            }}
+          >
+            <p style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: '500', color: 'var(--text-h, #f1f5f9)' }}>
+              Chưa có suất diễn nào
+            </p>
+            <p style={{ margin: 0, fontSize: '13px' }}>
+              Hãy thêm suất diễn đầu tiên cho sự kiện bằng biểu mẫu bên dưới.
+            </p>
+          </div>
+        )}
+
+        {/* Danh sách các suất diễn */}
+        {!loadingShowtimes && !showtimesError && sortedShowtimes.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {sortedShowtimes.map((s, idx) => {
+              return (
+                <div
+                  key={s.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '14px 16px',
+                    backgroundColor: 'var(--bg, #16171d)',
+                    border: '1px solid var(--border, #2e303a)',
+                    borderRadius: '6px',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--code-bg, #1f2028)',
+                        border: '1px solid var(--border, #2e303a)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-h, #f1f5f9)',
+                      }}
+                    >
+                      {idx + 1}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-h, #f1f5f9)' }}>
+                        Bắt đầu: {formatDateTime(s.startTime)}
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text, #9ca3af)', marginTop: '2px' }}>
+                        {s.endTime ? `Kết thúc: ${formatDateTime(s.endTime)}` : 'Chưa thiết lập giờ kết thúc'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span
+                      style={{
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        backgroundColor: 'var(--code-bg, #1f2028)',
+                        color: 'var(--text-h, #f1f5f9)',
+                        border: '1px solid var(--border, #2e303a)',
+                      }}
+                    >
+                      Suất #{idx + 1}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Form thêm suất diễn */}
+        <ShowtimeForm
+          eventId={id}
+          existingShowtimes={showtimes}
+          onShowtimeCreated={(newShowtime) => {
+            setShowtimes((prev) => [...prev, newShowtime]);
+          }}
+        />
       </div>
     </div>
   );

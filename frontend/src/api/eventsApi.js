@@ -58,6 +58,34 @@ const mockEvents = [
   },
 ];
 
+// Danh sách mock suất diễn lưu ở module scope
+const mockShowtimes = [
+  {
+    id: 'st-001',
+    eventId: 'evt-001',
+    startTime: '2026-10-15T19:30',
+    endTime: '2026-10-15T22:00',
+  },
+  {
+    id: 'st-002',
+    eventId: 'evt-001',
+    startTime: '2026-10-16T19:30',
+    endTime: '2026-10-16T22:00',
+  },
+  {
+    id: 'st-003',
+    eventId: 'evt-002',
+    startTime: '2026-11-05T08:00',
+    endTime: '2026-11-05T17:00',
+  },
+  {
+    id: 'st-004',
+    eventId: 'evt-003',
+    startTime: '2026-10-20T20:00',
+    endTime: '2026-10-20T22:30',
+  },
+];
+
 export const getEvents = async () => {
   // TODO: thay bằng API thật để sau này đổi dễ
   // Khi backend hoàn thiện:
@@ -131,6 +159,56 @@ export const createEvent = async (data) => {
 
       mockEvents.unshift(newEvent);
       resolve({ ...newEvent });
+    }, 500);
+  });
+};
+
+export const getShowtimes = async (eventId) => {
+  // TODO: thay bằng API thật để sau này đổi dễ
+  // Khi backend hoàn thiện:
+  // const response = await axiosClient.get(`/events/${eventId}/showtimes`);
+  // return response.data;
+
+  if (!axiosClient) {
+    throw new Error('axiosClient is not initialized');
+  }
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const list = mockShowtimes.filter((s) => s.eventId === eventId);
+      resolve([...list]);
+    }, 500);
+  });
+};
+
+export const createShowtime = async (eventId, data) => {
+  // TODO: thay bằng API thật để sau này đổi dễ
+  // Khi backend hoàn thiện:
+  // const response = await axiosClient.post(`/events/${eventId}/showtimes`, data);
+  // return response.data;
+
+  if (!axiosClient) {
+    throw new Error('axiosClient is not initialized');
+  }
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const newShowtime = {
+        id: `st-${Date.now()}`,
+        eventId,
+        startTime: data.startTime,
+        endTime: data.endTime || null,
+      };
+
+      mockShowtimes.push(newShowtime);
+
+      // Cập nhật số suất diễn cho sự kiện trong mockEvents
+      const targetEvent = mockEvents.find((e) => e.id === eventId);
+      if (targetEvent) {
+        targetEvent.showCount = (targetEvent.showCount || 0) + 1;
+      }
+
+      resolve({ ...newShowtime });
     }, 500);
   });
 };
