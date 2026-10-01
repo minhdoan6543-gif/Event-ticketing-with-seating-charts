@@ -38,8 +38,11 @@ if (!string.IsNullOrEmpty(connectionString))
                                        .Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
 }
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
 
 var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
                       ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
@@ -63,6 +66,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ISeatingChartValidator, SeatingChartValidator>();
+builder.Services.AddScoped<ISeatReservationService, SeatReservationService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
@@ -126,6 +130,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapSeatingChartEndpoints();
+app.MapSeatReservationEndpoints();
 
 var summaries = new[]
 {

@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<Seat> Seats { get; set; }
     public DbSet<SeatCategory> SeatCategories { get; set; }
+    public DbSet<Performance> Performances { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +79,16 @@ public class AppDbContext : DbContext
                 .HasForeignKey(e => new { e.PerformanceId, e.SeatCategoryId })
                 .HasPrincipalKey(category => new { category.PerformanceId, category.Id })
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Performance>(entity =>
+        {
+            entity.ToTable("performances");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Title).HasColumnName("title").HasMaxLength(255);
+            entity.Property(e => e.StartTime).HasColumnName("start_time");
+            entity.Property(e => e.EndTime).HasColumnName("end_time");
+            entity.Property(e => e.IsSalesClosed).HasColumnName("is_sales_closed");
         });
 
         // Seed Roles
