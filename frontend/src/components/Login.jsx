@@ -34,7 +34,13 @@ export default function Login() {
           localStorage.setItem('role', role);
         }
         
-        navigate('/');
+        const params = new URLSearchParams(window.location.search);
+        const returnUrl = params.get('returnUrl');
+        if (returnUrl) {
+          navigate(returnUrl);
+        } else {
+          navigate('/');
+        }
       } else {
         setError('Login failed: No token received.');
       }

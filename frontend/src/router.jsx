@@ -8,11 +8,27 @@ import CreateEvent from './components/CreateEvent.jsx';
 import EventDetail from './components/EventDetail.jsx';
 import RequireRoleRoute from './components/RequireRoleRoute.jsx';
 
+import Home from './pages/Home.jsx';
+import ShowtimeDetail from './pages/ShowtimeDetail.jsx';
+import SeatMap from './pages/SeatMap.jsx';
+
 export const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
     children: [
+      {
+        index: true,
+        element: <Home />,
+      },
+      {
+        path: 'shows/:id',
+        element: <ShowtimeDetail />,
+      },
+      {
+        path: 'shows/:id/seats',
+        element: <SeatMap />,
+      },
       {
         path: 'login',
         element: <Login />,
