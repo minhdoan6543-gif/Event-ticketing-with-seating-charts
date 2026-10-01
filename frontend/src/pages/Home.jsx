@@ -17,7 +17,8 @@ export default function Home() {
       
       const response = await axiosClient.get(url);
       
-      const { items, nextCursor: returnedCursor } = response.data;
+      const items = response.data.items || [];
+      const returnedCursor = response.data.nextCursor;
       
       if (cursor) {
         setEvents((prev) => [...prev, ...items]);
@@ -96,6 +97,12 @@ export default function Home() {
       </div>
 
       {loading && <div style={{ textAlign: 'center', marginTop: '20px' }}>Đang tải...</div>}
+
+      {!loading && events.length === 0 && (
+        <div style={{ textAlign: 'center', marginTop: '20px', color: '#555', fontSize: '16px' }}>
+          Hiện chưa có sự kiện nào mở bán
+        </div>
+      )}
 
       {nextCursor && !loading && (
         <div style={{ textAlign: 'center', marginTop: '30px' }}>
