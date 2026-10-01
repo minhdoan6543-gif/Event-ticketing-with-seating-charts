@@ -133,150 +133,6 @@ app.MapGet("/weatherforecast", () =>
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
             Random.Shared.Next(-20, 55),
-Ở tin nhắn trước, khối code ở phần đầu bị lỗi hiển thị nên đã dính một đoạn chữ tiếng Việt vào giữa lệnh C# (chỗ dòng `.Cấu trúc cơ sở dữ liệu...`). Khi bạn copy toàn bộ dán vào, trình biên dịch của GitHub Actions không hiểu cú pháp đó nên đã báo lỗi ở bước **`CI / build`**.
-
-Bạn chỉ cần cập nhật lại đúng file **`EventTicketing.Api/Program.cs`** bằng **duy nhất một khối code sạch 100%** dưới đây:
-
----
-
-### File `EventTicketing.Api/Program.cs` chuẩn:
-
-```csharp
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using EventTicketing.Api.Data;
-using EventTicketing.Api.Entities;
-using EventTicketing.Api.Security;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
-using StackExchange.Redis;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-builder.Services.AddOpenApi(options =>
-{
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
-    {
-        document.Servers = [
-            new() { Url = "/" }
-        ];
-
-        return Task.CompletedTask;
-    });
-});
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                       ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
-
-if (!string.IsNullOrEmpty(connectionString))
-{
-    connectionString = connectionString.Replace("${DB_HOST}", Environment.GetEnvironmentVariable("DB_HOST"))
-                                       .Replace("${DB_PORT}", Environment.GetEnvironmentVariable("DB_PORT"))
-                                       .Replace("${DB_NAME}", Environment.GetEnvironmentVariable("DB_NAME"))
-                                       .Replace("${DB_USER}", Environment.GetEnvironmentVariable("DB_USER"))
-                                       .Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
-}
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
-
-var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
-                      ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
-
-if (string.IsNullOrEmpty(redisConnection) || redisConnection == "${REDIS_CONNECTION}")
-{
-    redisConnection = "localhost:6379";
-}
-else
-{
-    var envRedis = Environment.GetEnvironmentVariable("REDIS_CONNECTION");
-    if (!string.IsNullOrEmpty(envRedis))
-    {
-        redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", envRedis);
-    }
-}
-
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(redisConnection));
-
-builder.Services.AddHealthChecks();
-
-var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
-builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
-        };
-    });
-
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
-
-builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("Frontend", policy =>
-    {
-        policy
-            .WithOrigins(
-                "[https://event-ticketing-with-seating-charts-1.onrender.com](https://event-ticketing-with-seating-charts-1.onrender.com)",
-                "[https://event-ticketing-with-seating-charts.onrender.com](https://event-ticketing-with-seating-charts.onrender.com)",
-                "http://localhost:5173",
-                "http://localhost:3000"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
-
-var app = builder.Build();
-
-// Automatically apply migrations at startup
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-}
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
-{
-    app.MapOpenApi().AllowAnonymous();
-    app.MapScalarApiReference().AllowAnonymous();
-}
-
-app.UseHttpsRedirection();
-app.UseRouting();
-app.UseCors("Frontend");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapHealthChecks("/health").AllowAnonymous();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
@@ -313,7 +169,6 @@ app.MapPost("/api/auth/register", async (
     db.Users.Add(newUser);
     await db.SaveChangesAsync();
 
-    // Gán role mặc định "Buyer" (Id = 1) vào bảng UserRoles
     var buyerRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Buyer")
                     ?? await db.Roles.SingleOrDefaultAsync(r => r.Id == 1);
 
@@ -399,7 +254,6 @@ app.MapPost("/api/auth/login", async (
         new Claim(ClaimTypes.Email, user.Email)
     };
 
-    // Load actual roles from Database
     var userRoles = user.UserRoles
         .Select(ur => ur.Role?.Name)
         .Where(name => !string.IsNullOrEmpty(name))
