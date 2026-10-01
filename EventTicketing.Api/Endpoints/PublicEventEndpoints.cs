@@ -39,7 +39,7 @@ public static class PublicEventEndpoints
                 if (cachedStr.HasValue)
                 {
                     var cachedResponse = JsonSerializer.Deserialize<PublicEventListResponse>(
-                        cachedStr.ToString(), 
+                        cachedStr.ToString(),
                         new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                     if (cachedResponse != null)
                         return Results.Ok(cachedResponse);
