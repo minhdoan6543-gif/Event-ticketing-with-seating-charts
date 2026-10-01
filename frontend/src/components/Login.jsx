@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import axiosClient from '../api/axiosClient';
 
@@ -18,17 +18,11 @@ export default function Login() {
     try {
       const response = await axiosClient.post('/auth/login', { email, password });
       
-      // Assuming response contains token. 
-      // If the backend returned a message & userId, we might need to adjust this depending on if token is returned.
-      // Wait, in previous task I returned { message: "Login successful", userId: user.Id }. I didn't actually generate a JWT in the backend yet! 
-      // But the prompt says: "Upon successful login, decode the JWT to extract the user's Role and store it securely."
-      // So I will assume the backend login endpoint returns a `token` field (perhaps updated by another team member or expected to be present).
       const { token } = response.data;
       if (token) {
         localStorage.setItem('token', token);
         
         const decoded = jwtDecode(token);
-        // The role claim key varies in .NET, commonly:
         const role = decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || decoded.role || decoded.Role;
         if (role) {
           localStorage.setItem('role', role);
@@ -80,10 +74,14 @@ export default function Login() {
             style={{ width: '100%', padding: '8px' }}
           />
         </div>
-        <button type="submit" disabled={isLoading} style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: '#fff', border: 'none' }}>
+        <button type="submit" disabled={isLoading} style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: '#fff', border: 'none', marginBottom: '15px' }}>
           {isLoading ? 'Logging in...' : 'Login'}
         </button>
       </form>
+      <div style={{ textAlign: 'center' }}>
+        <span>Don't have an account? </span>
+        <Link to="/register" style={{ color: '#007bff', textDecoration: 'underline' }}>Register</Link>
+      </div>
     </div>
   );
 }
