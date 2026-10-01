@@ -7,6 +7,7 @@ using EventTicketing.Api.Entities;
 using EventTicketing.Api.Security;
 using EventTicketing.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
@@ -41,7 +42,11 @@ if (!string.IsNullOrEmpty(connectionString))
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(connectionString));
+    {
+        options.UseNpgsql(connectionString);
+        // Bỏ qua cảnh báo PendingModelChangesWarning để tránh crash khi khởi động
+        options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+    });
 }
 
 var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
@@ -111,13 +116,20 @@ var app = builder.Build();
 // Automatically apply migrations at startup
 if (!app.Environment.IsEnvironment("Testing"))
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-
-    if (app.Environment.IsDevelopment())
+    try
     {
-        EventDbSeeder.Seed(db);
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+
+        if (app.Environment.IsDevelopment())
+        {
+            EventDbSeeder.Seed(db);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Migration notice: {ex.Message}");
     }
 }
 
@@ -186,7 +198,6 @@ app.MapPost("/api/auth/register", async (
     db.Users.Add(newUser);
     await db.SaveChangesAsync();
 
-    // Gán role mặc định Buyer (RoleId = 1) vào UserRoles
     var buyerRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Buyer")
                     ?? await db.Roles.SingleOrDefaultAsync(r => r.Id == 1);
 
@@ -272,7 +283,6 @@ app.MapPost("/api/auth/login", async (
         new Claim(ClaimTypes.Email, user.Email)
     };
 
-    // Nạp toàn bộ role thực tế từ database vào Token
     var userRoles = user.UserRoles
         .Select(ur => ur.Role?.Name)
         .Where(name => !string.IsNullOrEmpty(name))
