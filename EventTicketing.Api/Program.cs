@@ -110,6 +110,11 @@ if (!app.Environment.IsEnvironment("Testing"))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    if (app.Environment.IsDevelopment())
+    {
+        EventDbSeeder.Seed(db);
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -126,6 +131,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapSeatingChartEndpoints();
+app.MapPublicEventEndpoints();
 
 var summaries = new[]
 {
