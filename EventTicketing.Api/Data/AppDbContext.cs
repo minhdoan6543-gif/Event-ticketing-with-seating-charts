@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<Seat> Seats { get; set; }
     public DbSet<SeatCategory> SeatCategories { get; set; }
+    public DbSet<Event> Events { get; set; }
+    public DbSet<Showtime> Showtimes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +80,53 @@ public class AppDbContext : DbContext
                 .HasForeignKey(e => new { e.PerformanceId, e.SeatCategoryId })
                 .HasPrincipalKey(category => new { category.PerformanceId, category.Id })
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Event>(entity =>
+        {
+            entity.ToTable("events", table =>
+            {
+                table.HasCheckConstraint("CK_events_status", "status IN ('DRAFT', 'PUBLISHED', 'ENDED')");
+            });
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(200);
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.Location).HasColumnName("location").HasMaxLength(300);
+            entity.Property(e => e.ImageUrl).HasColumnName("image_url");
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion(
+                    status => status.ToString().ToUpperInvariant(),
+                    value => Enum.Parse<EventStatus>(value, true))
+                .HasMaxLength(20);
+            entity.Property(e => e.OwnerUserId).HasColumnName("owner_user_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone");
+        });
+
+        modelBuilder.Entity<Showtime>(entity =>
+        {
+            entity.ToTable("showtimes", table =>
+            {
+                table.HasCheckConstraint("CK_showtimes_status", "status IN ('DRAFT', 'ONSALE', 'CLOSED')");
+            });
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.EventId).HasColumnName("event_id");
+            entity.Property(e => e.StartTime).HasColumnName("start_time").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.EndTime).HasColumnName("end_time").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion(
+                    status => status.ToString().ToUpperInvariant(),
+                    value => Enum.Parse<ShowtimeStatus>(value, true))
+                .HasMaxLength(20);
+
+            entity.HasIndex(e => new { e.Status, e.StartTime });
+
+            entity.HasOne(e => e.Event)
+                .WithMany(ev => ev.Showtimes)
+                .HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Seed Roles
