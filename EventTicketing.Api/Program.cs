@@ -2,8 +2,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using EventTicketing.Api.Data;
+using EventTicketing.Api.Endpoints;
 using EventTicketing.Api.Entities;
 using EventTicketing.Api.Security;
+using EventTicketing.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -36,8 +38,11 @@ if (!string.IsNullOrEmpty(connectionString))
                                        .Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
 }
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
 
 var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
                       ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
@@ -59,6 +64,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddHealthChecks();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<ISeatingChartValidator, SeatingChartValidator>();
+builder.Services.AddScoped<ISeatReservationService, SeatReservationService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
@@ -101,10 +109,16 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Automatically apply migrations at startup
-using (var scope = app.Services.CreateScope())
+if (!app.Environment.IsEnvironment("Testing"))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    if (app.Environment.IsDevelopment())
+    {
+        EventDbSeeder.Seed(db);
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -120,6 +134,9 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
+app.MapSeatingChartEndpoints();
+app.MapSeatReservationEndpoints();
+app.MapPublicEventEndpoints();
 
 var summaries = new[]
 {
@@ -169,6 +186,7 @@ app.MapPost("/api/auth/register", async (
     db.Users.Add(newUser);
     await db.SaveChangesAsync();
 
+    // Gán role mặc định Buyer (RoleId = 1) vào UserRoles
     var buyerRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Buyer")
                     ?? await db.Roles.SingleOrDefaultAsync(r => r.Id == 1);
 
@@ -254,6 +272,7 @@ app.MapPost("/api/auth/login", async (
         new Claim(ClaimTypes.Email, user.Email)
     };
 
+    // Nạp toàn bộ role thực tế từ database vào Token
     var userRoles = user.UserRoles
         .Select(ur => ur.Role?.Name)
         .Where(name => !string.IsNullOrEmpty(name))
@@ -297,3 +316,5 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
+
+public partial class Program { }
