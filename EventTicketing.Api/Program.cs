@@ -2,10 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using EventTicketing.Api.Data;
-using EventTicketing.Api.Endpoints;
 using EventTicketing.Api.Entities;
 using EventTicketing.Api.Security;
-using EventTicketing.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -38,11 +36,8 @@ if (!string.IsNullOrEmpty(connectionString))
                                        .Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
 }
 
-if (!builder.Environment.IsEnvironment("Testing"))
-{
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(connectionString));
-}
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
                       ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
@@ -64,9 +59,6 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddHealthChecks();
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<ISeatingChartValidator, SeatingChartValidator>();
-builder.Services.AddScoped<ISeatReservationService, SeatReservationService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
 builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
@@ -109,16 +101,10 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Automatically apply migrations at startup
-if (!app.Environment.IsEnvironment("Testing"))
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-
-    if (app.Environment.IsDevelopment())
-    {
-        EventDbSeeder.Seed(db);
-    }
 }
 
 // Configure the HTTP request pipeline.
@@ -134,9 +120,156 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
-app.MapSeatingChartEndpoints();
-app.MapSeatReservationEndpoints();
-app.MapPublicEventEndpoints();
+
+var summaries = new[]
+{
+    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+};
+
+app.MapGet("/weatherforecast", () =>
+{
+    var forecast = Enumerable.Range(1, 5).Select(index =>
+        new WeatherForecast
+        (
+            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            Random.Shared.Next(-20, 55),
+            summaries[Random.Shared.Next(summaries.Length)]
+        ))
+        .Cấu trúc cơ sở dữ liệu của bạn đã định nghĩa sẵn 5 vai trò trong `AppDbContext`: **Buyer (1)**, **Organizer (2)**, **GateStaff (3)**, **Accountant (4)** và **Admin (5)**.
+
+Dưới đây là mã nguồn hoàn chỉnh của file **`EventTicketing.Api/Program.cs`** được cập nhật để:
+1. **Khi người dùng đăng ký (`/api/auth/register`)**: Tự động gán quyền mặc định là **`Buyer`** (RoleId = 1).
+2. **Khi đăng nhập (`/api/auth/login`)**: Tự động truy vấn bảng quan hệ `UserRoles` -> `Roles` qua EF Core và nạp toàn bộ vai trò thực tế của người dùng đó vào JWT Token.
+
+---
+
+### 1. File `EventTicketing.Api/Program.cs` cập nhật
+
+Mở file **`EventTicketing.Api/Program.cs`**, chọn tất cả (`Ctrl + A`) và dán toàn bộ đoạn mã sau:
+
+```csharp
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using EventTicketing.Api.Data;
+using EventTicketing.Api.Entities;
+using EventTicketing.Api.Security;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
+using StackExchange.Redis;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Servers = [
+            new() { Url = "/" }
+        ];
+
+        return Task.CompletedTask;
+    });
+});
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+
+if (!string.IsNullOrEmpty(connectionString))
+{
+    connectionString = connectionString.Replace("${DB_HOST}", Environment.GetEnvironmentVariable("DB_HOST"))
+                                       .Replace("${DB_PORT}", Environment.GetEnvironmentVariable("DB_PORT"))
+                                       .Replace("${DB_NAME}", Environment.GetEnvironmentVariable("DB_NAME"))
+                                       .Replace("${DB_USER}", Environment.GetEnvironmentVariable("DB_USER"))
+                                       .Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
+}
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+var redisConnection = builder.Configuration.GetSection("Redis")["ConnectionString"]
+                      ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
+
+if (string.IsNullOrEmpty(redisConnection) || redisConnection == "${REDIS_CONNECTION}")
+{
+    redisConnection = "localhost:6379";
+}
+else
+{
+    var envRedis = Environment.GetEnvironmentVariable("REDIS_CONNECTION");
+    if (!string.IsNullOrEmpty(envRedis))
+    {
+        redisConnection = redisConnection.Replace("${REDIS_CONNECTION}", envRedis);
+    }
+}
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(redisConnection));
+
+builder.Services.AddHealthChecks();
+
+var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "DayLaMotKhoaBaoMatDuDaiChoJwtToken123!";
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "[https://event-ticketing-with-seating-charts-1.onrender.com](https://event-ticketing-with-seating-charts-1.onrender.com)",
+                "[https://event-ticketing-with-seating-charts.onrender.com](https://event-ticketing-with-seating-charts.onrender.com)",
+                "http://localhost:5173",
+                "http://localhost:3000"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
+var app = builder.Build();
+
+// Automatically apply migrations at startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
+}
+
+app.UseHttpsRedirection();
+app.UseRouting();
+app.UseCors("Frontend");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapHealthChecks("/health").AllowAnonymous();
 
 var summaries = new[]
 {
@@ -186,6 +319,20 @@ app.MapPost("/api/auth/register", async (
     db.Users.Add(newUser);
     await db.SaveChangesAsync();
 
+    // Default role for new users is "Buyer" (Id = 1)
+    var buyerRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Buyer")
+                    ?? await db.Roles.SingleOrDefaultAsync(r => r.Id == 1);
+
+    if (buyerRole != null)
+    {
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = newUser.Id,
+            RoleId = buyerRole.Id
+        });
+        await db.SaveChangesAsync();
+    }
+
     return Results.Ok(new { message = "Registration successful" });
 })
 .WithName("Register")
@@ -213,7 +360,11 @@ app.MapPost("/api/auth/login", async (
         return Results.Json(new { message = "Account locked for 15 minutes" }, statusCode: 403);
     }
 
-    var user = await db.Users.SingleOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+    var user = await db.Users
+        .Include(u => u.UserRoles)
+        .ThenInclude(ur => ur.Role)
+        .SingleOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+
     if (user == null)
     {
         return Results.Json(new { message = "Invalid email or password" }, statusCode: 401);
@@ -248,12 +399,27 @@ app.MapPost("/api/auth/login", async (
     var securityKey = new SymmetricSecurityKey(keyBytes);
     var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-    var claims = new[]
+    var claims = new List<Claim>
     {
         new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-        new Claim(ClaimTypes.Email, user.Email),
-        new Claim(ClaimTypes.Role, "Admin")
+        new Claim(ClaimTypes.Email, user.Email)
     };
+
+    // Load actual roles from Database
+    var userRoles = user.UserRoles
+        .Select(ur => ur.Role?.Name)
+        .Where(name => !string.IsNullOrEmpty(name))
+        .ToList();
+
+    if (userRoles.Count == 0)
+    {
+        userRoles.Add("Buyer");
+    }
+
+    foreach (var roleName in userRoles)
+    {
+        claims.Add(new Claim(ClaimTypes.Role, roleName!));
+    }
 
     var tokenDescriptor = new JwtSecurityToken(
         claims: claims,
@@ -266,6 +432,7 @@ app.MapPost("/api/auth/login", async (
     {
         message = "Login successful",
         userId = user.Id,
+        roles = userRoles,
         token = tokenString
     });
 })
@@ -282,5 +449,3 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
-
-public partial class Program { }
