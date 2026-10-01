@@ -10,6 +10,7 @@ import RequireRoleRoute from './components/RequireRoleRoute.jsx';
 
 import Home from './pages/Home.jsx';
 import ShowtimeDetail from './pages/ShowtimeDetail.jsx';
+import SeatMap from './pages/SeatMap.jsx';
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +24,10 @@ export const router = createBrowserRouter([
       {
         path: 'shows/:id',
         element: <ShowtimeDetail />,
+      },
+      {
+        path: 'shows/:id/seats',
+        element: <SeatMap />,
       },
       {
         path: 'login',
