@@ -4,6 +4,7 @@ public class PublicEventItemDto
 {
     public int EventId { get; set; }
     public required string Name { get; set; }
+    public string? Description { get; set; }
     public required string Location { get; set; }
     public string? ImageUrl { get; set; }
     public PublicNearestShowtimeDto? NearestShowtime { get; set; }

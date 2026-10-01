@@ -78,6 +78,7 @@ public static class PublicEventEndpoints
                 {
                     e.Id,
                     e.Name,
+                    e.Description,
                     e.Location,
                     e.ImageUrl,
                     e.CreatedAt,
@@ -87,6 +88,7 @@ public static class PublicEventEndpoints
                 {
                     e.Id,
                     e.Name,
+                    e.Description,
                     e.Location,
                     e.ImageUrl,
                     e.CreatedAt,
@@ -120,6 +122,7 @@ public static class PublicEventEndpoints
             {
                 EventId = e.Id,
                 Name = e.Name,
+                Description = e.Description,
                 Location = e.Location,
                 ImageUrl = e.ImageUrl,
                 ShowtimeCount = e.ShowtimeCount,

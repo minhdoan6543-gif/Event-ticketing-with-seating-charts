@@ -69,8 +69,9 @@ export default function Home() {
           ))}
         </div>
       ) : !loading && events.length === 0 && !error ? (
-        <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f9f9f9', borderRadius: '8px', marginTop: '20px' }}>
-          <h3 style={{ color: '#666', margin: 0 }}>Không có sự kiện nào đang mở bán. Vui lòng quay lại sau!</h3>
+        <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#f9f9f9', borderRadius: '8px', marginTop: '20px' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '10px' }}>🎟️</div>
+          <h3 style={{ color: '#666', margin: 0 }}>Hiện chưa có sự kiện nào đang mở bán. Vui lòng quay lại sau!</h3>
         </div>
       ) : (
         <div style={{ 
@@ -111,6 +112,11 @@ export default function Home() {
               
               <div style={{ padding: '15px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem' }}>{event.name}</h3>
+                {event.description && (
+                  <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.9rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {event.description}
+                  </p>
+                )}
                 <p style={{ margin: '0 0 5px 0', color: '#555' }}>📍 {event.location}</p>
                 {event.hasAvailableShowtimes && event.nearestShowtime ? (
                   <>
@@ -125,7 +131,7 @@ export default function Home() {
                     <button 
                       style={{ marginTop: 'auto', padding: '8px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                     >
-                      Xem chi tiết & Đặt vé
+                      Xem chi tiết / Mua vé
                     </button>
                   </>
                 ) : (
