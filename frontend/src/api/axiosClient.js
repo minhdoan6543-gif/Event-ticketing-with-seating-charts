@@ -1,32 +1,27 @@
 import axios from 'axios';
-import { router } from '../router.jsx';
+
+// 1. Tự động lấy URL từ file .env, nếu không có thì trỏ thẳng về Backend Render
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://event-ticketing-with-seating-charts.onrender.com/api';
 
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
-axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-axiosClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('role');
-      if (router) {
-        router.navigate('/login');
-      } else {
-        window.location.href = '/login';
-      }
+// 2. Tự động đính kèm Token đăng nhập vào Header nếu đã đăng nhập
+axiosClient.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
 );
 
 export default axiosClient;
