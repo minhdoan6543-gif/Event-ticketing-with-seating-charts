@@ -133,19 +133,13 @@ app.MapGet("/weatherforecast", () =>
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
             Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .Cấu trúc cơ sở dữ liệu của bạn đã định nghĩa sẵn 5 vai trò trong `AppDbContext`: **Buyer (1)**, **Organizer (2)**, **GateStaff (3)**, **Accountant (4)** và **Admin (5)**.
+Ở tin nhắn trước, khối code ở phần đầu bị lỗi hiển thị nên đã dính một đoạn chữ tiếng Việt vào giữa lệnh C# (chỗ dòng `.Cấu trúc cơ sở dữ liệu...`). Khi bạn copy toàn bộ dán vào, trình biên dịch của GitHub Actions không hiểu cú pháp đó nên đã báo lỗi ở bước **`CI / build`**.
 
-Dưới đây là mã nguồn hoàn chỉnh của file **`EventTicketing.Api/Program.cs`** được cập nhật để:
-1. **Khi người dùng đăng ký (`/api/auth/register`)**: Tự động gán quyền mặc định là **`Buyer`** (RoleId = 1).
-2. **Khi đăng nhập (`/api/auth/login`)**: Tự động truy vấn bảng quan hệ `UserRoles` -> `Roles` qua EF Core và nạp toàn bộ vai trò thực tế của người dùng đó vào JWT Token.
+Bạn chỉ cần cập nhật lại đúng file **`EventTicketing.Api/Program.cs`** bằng **duy nhất một khối code sạch 100%** dưới đây:
 
 ---
 
-### 1. File `EventTicketing.Api/Program.cs` cập nhật
-
-Mở file **`EventTicketing.Api/Program.cs`**, chọn tất cả (`Ctrl + A`) và dán toàn bộ đoạn mã sau:
+### File `EventTicketing.Api/Program.cs` chuẩn:
 
 ```csharp
 using System.IdentityModel.Tokens.Jwt;
@@ -319,7 +313,7 @@ app.MapPost("/api/auth/register", async (
     db.Users.Add(newUser);
     await db.SaveChangesAsync();
 
-    // Default role for new users is "Buyer" (Id = 1)
+    // Gán role mặc định "Buyer" (Id = 1) vào bảng UserRoles
     var buyerRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Buyer")
                     ?? await db.Roles.SingleOrDefaultAsync(r => r.Id == 1);
 
