@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 
@@ -22,7 +22,7 @@ export default function ShowtimeDetail() {
           setShowtime(data);
           setError(false);
         }
-      } catch (err) {
+      } catch {
         setError(true);
       } finally {
         setLoading(false);

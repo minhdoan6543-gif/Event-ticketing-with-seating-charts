@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 
@@ -34,6 +34,7 @@ export default function Home() {
   };
 
   useEffect(() => {
+// eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents();
   }, []);
 
