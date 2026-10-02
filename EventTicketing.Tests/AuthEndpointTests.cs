@@ -72,7 +72,6 @@ public class AuthEndpointTests
         // Arrange
         using var factory = CreateTestFactory();
         var client = factory.CreateClient();
-        
         var request1 = new
         {
             email = "duplicate@gmail.com",
