@@ -207,21 +207,17 @@ app.MapPost("/api/auth/register", async (
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
-
     db.Users.Add(newUser);
-    
     try 
     {
-        await db.SaveChangesAsync();
+    await db.SaveChangesAsync();
     } 
     catch (Microsoft.EntityFrameworkCore.DbUpdateException) 
     {
-        return Results.Problem(statusCode: 409, title: "Conflict", detail: "Email or username already registered");
+    return Results.Problem(statusCode: 409, title: "Conflict", detail: "Email or username already registered");
     }
-
     var buyerRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Buyer")
                     ?? await db.Roles.SingleOrDefaultAsync(r => r.Id == 1);
-
     if (buyerRole != null)
     {
         db.UserRoles.Add(new UserRole
@@ -231,7 +227,6 @@ app.MapPost("/api/auth/register", async (
         });
         await db.SaveChangesAsync();
     }
-
     return Results.Ok(new { message = "Registration successful" });
 })
 .WithName("Register")
