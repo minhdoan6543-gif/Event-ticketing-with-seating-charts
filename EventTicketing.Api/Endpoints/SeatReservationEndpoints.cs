@@ -111,14 +111,23 @@ public static class SeatReservationEndpoints
                 return Results.Unauthorized();
             }
 
-            var released = await reservationService.ReleaseSeatAsync(performanceId, seatId, userId.Value, ct);
-            return released
-                ? Results.Ok(new { success = true, message = "Đã hủy giữ chỗ thành công." })
-                : Results.NotFound(new { success = false, message = "Không tìm thấy ghế được giữ bởi người dùng." });
+            var result = await reservationService.ReleaseSeatAsync(performanceId, seatId, userId.Value, ct);
+            if (result.IsSuccess)
+            {
+                return Results.Ok(new { success = true, message = "Đã hủy giữ chỗ thành công." });
+            }
+
+            if (result.FailureReason == ReleaseFailureReason.Forbidden)
+            {
+                return Results.Json(new { success = false, message = result.ErrorMessage }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.NotFound(new { success = false, message = result.ErrorMessage });
         })
         .WithName("ReleaseSeatHold")
         .WithSummary("Hủy giữ chỗ ghế")
         .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status403Forbidden)
         .Produces(StatusCodes.Status404NotFound)
         .AllowAnonymous();
 

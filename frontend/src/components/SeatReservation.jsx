@@ -107,20 +107,40 @@ export default function SeatReservation({ performanceId, currentUserId }) {
 
     // Nếu ghế này đã được chính user giữ -> Cho phép user click để hủy giữ (Release)
     if (seat.displayStatus === 'HeldByMe') {
+      const prevHeldSeats = [...heldSeats];
+      const prevSeats = [...seats];
+      const prevExpiresAtUtc = expiresAtUtc;
+      const prevRemainingSeconds = remainingSeconds;
+
+      // Optimistic update
+      const newHeldSeats = prevHeldSeats.filter((s) => s.id !== seat.id);
+      setHeldSeats(newHeldSeats);
+      setSeats((prev) =>
+        prev.map((s) => (s.id === seat.id ? { ...s, displayStatus: 'Available', canSelect: true } : s))
+      );
+
+      if (newHeldSeats.length === 0) {
+        setExpiresAtUtc(null);
+        setRemainingSeconds(0);
+      }
+
       try {
         await releaseSeat(performanceId, seat.id, currentUserId);
-        setHeldSeats((prev) => prev.filter((s) => s.id !== seat.id));
-        setSeats((prev) =>
-          prev.map((s) => (s.id === seat.id ? { ...s, displayStatus: 'Available', canSelect: true } : s))
-        );
-
-        // Nếu đã bỏ chọn hết ghế, dừng đếm ngược
-        if (heldSeats.length <= 1) {
-          setExpiresAtUtc(null);
-          setRemainingSeconds(0);
-        }
       } catch (err) {
         console.error('Lỗi hủy giữ ghế:', err);
+        // Rollback
+        setHeldSeats(prevHeldSeats);
+        setSeats(prevSeats);
+        setExpiresAtUtc(prevExpiresAtUtc);
+        setRemainingSeconds(prevRemainingSeconds);
+        
+        const status = err.response?.status;
+        const msg = err.response?.data?.message || 'Không thể hủy ghế. Vui lòng thử lại.';
+        if (status === 403) {
+            setErrorMessage('Từ chối truy cập: ' + msg);
+        } else {
+            setErrorMessage(msg);
+        }
       }
       return;
     }

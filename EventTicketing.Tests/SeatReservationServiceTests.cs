@@ -312,7 +312,7 @@ public sealed class SeatReservationServiceTests
         await service.HoldSeatAsync(performanceId: 1, seatId: seat.Id, userId: 101);
 
         var released = await service.ReleaseSeatAsync(performanceId: 1, seatId: seat.Id, userId: 101);
-        Assert.True(released);
+        Assert.True(released.IsSuccess);
 
         database.Context.ChangeTracker.Clear();
         var dbSeat = await database.Context.Seats.FindAsync(seat.Id);
@@ -320,6 +320,52 @@ public sealed class SeatReservationServiceTests
         Assert.Equal(SeatStatus.Available, dbSeat.Status);
         Assert.Null(dbSeat.HeldByUserId);
         Assert.Null(dbSeat.HeldUntil);
+    }
+
+    [Fact]
+    public async Task ReleaseSeatAsync_AC1_ReleaseOneSeatKeepsOthersIntact()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var clock = new TestTimeProvider(BaselineTime);
+        var service = new SeatReservationService(database.Context, clock);
+
+        var seat1 = await CreateSeatAsync(database.Context, performanceId: 1, row: "A", number: "1", SeatStatus.Available);
+        var seat2 = await CreateSeatAsync(database.Context, performanceId: 1, row: "A", number: "2", SeatStatus.Available);
+
+        var hold1 = await service.HoldSeatAsync(performanceId: 1, seatId: seat1.Id, userId: 101);
+        var hold2 = await service.HoldSeatAsync(performanceId: 1, seatId: seat2.Id, userId: 101);
+
+        var released = await service.ReleaseSeatAsync(performanceId: 1, seatId: seat1.Id, userId: 101);
+        Assert.True(released.IsSuccess);
+
+        database.Context.ChangeTracker.Clear();
+        var dbSeat1 = await database.Context.Seats.FindAsync(seat1.Id);
+        var dbSeat2 = await database.Context.Seats.FindAsync(seat2.Id);
+
+        Assert.Equal(SeatStatus.Available, dbSeat1!.Status);
+        Assert.Null(dbSeat1.HeldByUserId);
+        Assert.Null(dbSeat1.HeldUntil);
+
+        Assert.Equal(SeatStatus.Held, dbSeat2!.Status);
+        Assert.Equal(101, dbSeat2.HeldByUserId);
+        Assert.Equal(hold1.HeldUntilUtc, dbSeat2.HeldUntil); // Cùng chung expiration
+    }
+
+    [Fact]
+    public async Task ReleaseSeatAsync_AC2_ReleaseAllSeatsRemovesHoldSession()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var clock = new TestTimeProvider(BaselineTime);
+        var service = new SeatReservationService(database.Context, clock);
+
+        var seat = await CreateSeatAsync(database.Context, performanceId: 1, row: "A", number: "1", SeatStatus.Available);
+        await service.HoldSeatAsync(performanceId: 1, seatId: seat.Id, userId: 101);
+
+        var released = await service.ReleaseSeatAsync(performanceId: 1, seatId: seat.Id, userId: 101);
+        Assert.True(released.IsSuccess);
+
+        var session = await service.GetUserHoldSessionAsync(performanceId: 1, userId: 101);
+        Assert.Null(session);
     }
 
     // =========================================================================
