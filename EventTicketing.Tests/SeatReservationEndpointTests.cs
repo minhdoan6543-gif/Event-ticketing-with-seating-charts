@@ -179,6 +179,44 @@ public class SeatReservationEndpointTests : IAsyncDisposable
         Assert.Equal("Available", freedSeat.GetProperty("displayStatus").GetString());
     }
 
+    [Fact]
+    public async Task ReleaseEndpoint_AC3_WhenHeldByAnotherUser_Returns403Forbidden_LeavesSeatIntact()
+    {
+        int seatId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var cat = new SeatCategory { PerformanceId = 1, Name = "Standard", NormalizedName = "STANDARD" };
+            db.SeatCategories.Add(cat);
+            await db.SaveChangesAsync();
+
+            var seat = new Seat { PerformanceId = 1, SeatCategoryId = cat.Id, Row = "E", Number = "5", Status = SeatStatus.Available };
+            db.Seats.Add(seat);
+            await db.SaveChangesAsync();
+            seatId = seat.Id;
+        }
+
+        // User A (101) giữ ghế
+        await client.PostAsJsonAsync($"/api/performances/1/seats/{seatId}/hold", new { UserId = 101 });
+
+        // User B (102) thử hủy ghế của User A
+        var deleteResponse = await client.DeleteAsync($"/api/performances/1/seats/{seatId}/hold?userIdQuery=102");
+        Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
+
+        var body = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(body.GetProperty("success").GetBoolean());
+        Assert.Equal("Ghế đang được giữ bởi người khác.", body.GetProperty("message").GetString());
+
+        // Kiểm tra ghế vẫn còn được giữ bởi User A
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var checkSeat = await db.Seats.FindAsync(seatId);
+            Assert.Equal(SeatStatus.Held, checkSeat!.Status);
+            Assert.Equal(101, checkSeat.HeldByUserId);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         client.Dispose();

@@ -10,6 +10,27 @@ public enum HoldFailureReason
     NotFound
 }
 
+public enum ReleaseFailureReason
+{
+    NotFound,
+    Forbidden
+}
+
+public sealed class ReleaseSeatResult
+{
+    public bool IsSuccess { get; private init; }
+    public ReleaseFailureReason? FailureReason { get; private init; }
+    public string? ErrorMessage { get; private init; }
+
+    public static ReleaseSeatResult Success() => new() { IsSuccess = true };
+    public static ReleaseSeatResult Failed(ReleaseFailureReason reason, string errorMessage) => new()
+    {
+        IsSuccess = false,
+        FailureReason = reason,
+        ErrorMessage = errorMessage
+    };
+}
+
 public sealed record HeldSeatDto(int Id, string Row, string Number, int SeatCategoryId, DateTime HeldUntilUtc);
 
 public sealed record SeatDisplayDto(
@@ -83,7 +104,7 @@ public interface ISeatReservationService
         int userId,
         CancellationToken cancellationToken = default);
 
-    Task<bool> ReleaseSeatAsync(
+    Task<ReleaseSeatResult> ReleaseSeatAsync(
         int performanceId,
         int seatId,
         int userId,

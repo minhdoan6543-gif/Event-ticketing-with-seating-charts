@@ -99,12 +99,26 @@ public sealed class SeatReservationService(AppDbContext db, TimeProvider timePro
         return HoldSeatResult.Failed("ghế vừa có người chọn", HoldFailureReason.AlreadyHeld, now, currentSeat);
     }
 
-    public async Task<bool> ReleaseSeatAsync(
+    public async Task<ReleaseSeatResult> ReleaseSeatAsync(
         int performanceId,
         int seatId,
         int userId,
         CancellationToken cancellationToken = default)
     {
+        var currentSeat = await db.Seats
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == seatId && s.PerformanceId == performanceId, cancellationToken);
+
+        if (currentSeat == null)
+        {
+            return ReleaseSeatResult.Failed(ReleaseFailureReason.NotFound, "Ghế không tồn tại.");
+        }
+
+        if (currentSeat.Status == SeatStatus.Held && currentSeat.HeldByUserId != null && currentSeat.HeldByUserId != userId)
+        {
+            return ReleaseSeatResult.Failed(ReleaseFailureReason.Forbidden, "Ghế đang được giữ bởi người khác.");
+        }
+
         var rows = await db.Seats
             .Where(s => s.Id == seatId
                      && s.PerformanceId == performanceId
@@ -116,7 +130,9 @@ public sealed class SeatReservationService(AppDbContext db, TimeProvider timePro
                 .SetProperty(s => s.HeldUntil, (DateTime?)null),
                 cancellationToken);
 
-        return rows > 0;
+        return rows > 0
+            ? ReleaseSeatResult.Success()
+            : ReleaseSeatResult.Failed(ReleaseFailureReason.NotFound, "Ghế không được giữ bởi bạn.");
     }
 
     public async Task<IReadOnlyList<SeatDisplayDto>> GetSeatingChartStatusAsync(
