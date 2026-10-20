@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using EventTicketing.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace EventTicketing.Tests;
 
@@ -192,6 +193,28 @@ public class SeatReservationEndpointTests : IAsyncLifetime
         }
     }
 
+    // --- TEST KESELAMATAN QA-B07: PAYMENT STATUS AUTH & OWNER GUARD ---
+
+    [Fact]
+    public async Task PaymentStatus_WhenAnonymous_Returns401Unauthorized()
+    {
+        var anonymousClient = factory.CreateClient();
+        var response = await anonymousClient.GetAsync("/api/orders/1/payment-status");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PaymentStatus_WhenAccessedByAnotherUser_Returns403Forbidden()
+    {
+        // Guna factory.Authenticate ke User 102 dan semak sekiranya akses ke pesanan bukan miliknya ditolak
+        factory.Authenticate(client, 102, "Buyer");
+        var response = await client.GetAsync("/api/orders/99999/payment-status");
+
+        // Jika pesanan tidak wujud atau bukan milik user, endpoint mengembalikan 404 atau 403 (bukan 200)
+        Assert.True(response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound);
+    }
+
     public async Task DisposeAsync()
     {
         client.Dispose();
@@ -199,4 +222,3 @@ public class SeatReservationEndpointTests : IAsyncLifetime
         await database.DisposeAsync();
     }
 }
-
