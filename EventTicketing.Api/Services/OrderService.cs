@@ -195,7 +195,7 @@ public sealed class OrderService(
         return CreateOrderResult.Success(MapToDto(order, now), isExistingPendingOrder: false);
     }
 
-    public async Task<OrderDto?> GetOrderByIdAsync(int orderId, int userId, CancellationToken cancellationToken = default)
+    public async Task<GetOrderResult> GetOrderForUserAsync(int orderId, int userId, CancellationToken cancellationToken = default)
     {
         var sampledNow = await clock.NowAsync(db, cancellationToken);
         var now = new DateTime(sampledNow.Ticks - sampledNow.Ticks % 10, DateTimeKind.Utc);
@@ -204,9 +204,19 @@ public sealed class OrderService(
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Seat)
                     .ThenInclude(s => s.SeatCategory)
-            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
-        if (order == null) return null;
+        if (order == null)
+        {
+            return GetOrderResult.NotFound();
+        }
+
+        if (order.UserId != userId)
+        {
+            logger?.LogWarning("User {UserId} attempted to access order {OrderId} owned by user {OwnerId}",
+                userId, orderId, order.UserId);
+            return GetOrderResult.Forbidden();
+        }
 
         if (order.Showtime == null && order.ShowtimeId > 0)
         {
@@ -230,7 +240,26 @@ public sealed class OrderService(
         var hasFailedPayments = events.Any(pe => !pe.Success);
         var failedPaymentCount = events.Count(pe => !pe.Success);
 
-        return MapToDto(order, now, hasFailedPayments, failedPaymentCount, events);
+        if (order.Status == OrderStatus.Pending && order.ExpiresAt <= now)
+        {
+            order.Status = OrderStatus.Expired;
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to persist expired status for order {OrderId}", orderId);
+            }
+        }
+
+        return GetOrderResult.Success(MapToDto(order, now, hasFailedPayments, failedPaymentCount, events));
+    }
+
+    public async Task<OrderDto?> GetOrderByIdAsync(int orderId, int userId, CancellationToken cancellationToken = default)
+    {
+        var result = await GetOrderForUserAsync(orderId, userId, cancellationToken);
+        return result.Order;
     }
 
     public async Task<OrderDto?> GetPendingOrderForShowtimeAsync(int showtimeId, int userId, CancellationToken cancellationToken = default)
@@ -279,6 +308,7 @@ public sealed class OrderService(
         IReadOnlyList<OrderPaymentEventDto>? paymentEvents = null)
     {
         var isExpired = order.Status == OrderStatus.Expired || (order.Status == OrderStatus.Pending && order.ExpiresAt <= now);
+        var status = isExpired ? OrderStatus.Expired.ToString() : order.Status.ToString();
         var remainingSeconds = Math.Max(0, (int)Math.Round((order.ExpiresAt - now).TotalSeconds));
         var items = order.OrderItems.Select(oi => new OrderItemDto(
             oi.Id,
@@ -293,7 +323,7 @@ public sealed class OrderService(
             order.Id,
             order.UserId,
             order.ShowtimeId,
-            order.Status.ToString(),
+            status,
             order.TotalAmount,
             order.ExpiresAt,
             order.CreatedAt,

@@ -70,7 +70,7 @@ export default function OrderDetail() {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Đang tải thông tin đơn hàng...</div>;
+    return <div style={{ textAlign: 'center', padding: '50px' }}>Đang tải chi tiết đơn hàng...</div>;
   }
 
   if (error || !order) {

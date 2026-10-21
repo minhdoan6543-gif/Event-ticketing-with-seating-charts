@@ -1,6 +1,6 @@
 namespace EventTicketing.Api.Models.Orders;
 
-public sealed record CreateOrderRequest(int? ShowtimeId = null);
+public sealed record CreateOrderRequest(int? ShowtimeId = null, decimal? TotalAmount = null);
 
 public sealed record OrderItemDto(
     int Id,
@@ -83,4 +83,18 @@ public sealed class CreateOrderResult
             LostSeats = lostSeats ?? Array.Empty<LostSeatDto>(),
             ServerTimeUtc = serverTimeUtc
         };
+}
+
+public enum GetOrderResultStatus
+{
+    Success,
+    NotFound,
+    Forbidden
+}
+
+public sealed record GetOrderResult(GetOrderResultStatus Status, OrderDto? Order = null)
+{
+    public static GetOrderResult Success(OrderDto order) => new(GetOrderResultStatus.Success, order);
+    public static GetOrderResult NotFound() => new(GetOrderResultStatus.NotFound);
+    public static GetOrderResult Forbidden() => new(GetOrderResultStatus.Forbidden);
 }
