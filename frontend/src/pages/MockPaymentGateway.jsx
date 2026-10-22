@@ -1,94 +1,217 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 
-export default function OrderDetail() {
-    const { orderId: paramOrderId } = useParams();
+export default function MockPaymentGateway() {
+    const { id: paramOrderId } = useParams();
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+
     const orderId = paramOrderId || searchParams.get('orderId');
 
-    const [paymentStatus, setPaymentStatus] = useState('confirming');
-    const [statusMessage, setStatusMessage] = useState('đang xác nhận thanh toán');
-    const [ticketUrl, setTicketUrl] = useState('');
+    const [stage, setStage] = useState('action');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [secondsLeft, setSecondsLeft] = useState(60);
 
     const pollingRef = useRef(null);
-    const startTimeRef = useRef(null);
+    const timerRef = useRef(null);
+
+    const getAuthToken = () => {
+        return localStorage.getItem('token') || localStorage.getItem('jwt');
+    };
+
+    const handleSimulatePayment = async (status) => {
+        setErrorMessage('');
+        setStage('confirming');
+
+        try {
+            const token = getAuthToken();
+            const response = await fetch('/api/payments/mock/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                    orderId: parseInt(orderId, 10),
+                    status
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Gagal mengirim simulasi pembayaran ke server.');
+            }
+        } catch (err) {
+            setErrorMessage(err.message || 'Terjadi kesalahan saat memproses pembayaran.');
+        }
+    };
 
     useEffect(() => {
-        if (!orderId) return;
+        if (stage !== 'confirming') return;
 
-        if (!startTimeRef.current) {
-            startTimeRef.current = Date.now();
-        }
+        timerRef.current = setInterval(() => {
+            setSecondsLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timerRef.current);
+                    clearInterval(pollingRef.current);
+                    setStage('timeout');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
 
-        const checkServerStatus = async () => {
-            const secondsPassed = (Date.now() - startTimeRef.current) / 1000;
-            if (secondsPassed >= 60) {
-                if (pollingRef.current) clearInterval(pollingRef.current);
-                setPaymentStatus('timeout');
-                setStatusMessage('Chưa có xác nhận sau 60 giây. Vui lòng kiểm tra lại trong lịch sử đơn thay vì kết luận thất bại.');
-                return;
-            }
-    // ... sisa kode lainnya tetap sama
-
+        const pollStatus = async () => {
             try {
-                // 2. Selalu panggil server langsung (tidak mempercayai URL parameter)
-                const res = await fetch(`/api/orders/${orderId}/payment-status`);
+                const token = getAuthToken();
+                const res = await fetch(`/api/orders/${orderId}/payment-status`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    }
+                });
+
+                if (res.status === 401) {
+                    navigate('/login');
+                    return;
+                }
+
+                if (res.status === 403) {
+                    setErrorMessage('Bạn không có quyền truy cập đơn hàng này.');
+                    setStage('action');
+                    return;
+                }
+
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.isPaid || data.status?.toLowerCase() === 'paid') {
-                        if (pollingRef.current) clearInterval(pollingRef.current);
-                        setPaymentStatus('paid');
-                        setStatusMessage('đã thanh toán');
-                        setTicketUrl(data.ticketUrl || `/tickets/order/${orderId}`);
+                    if (data.status === 'Paid' || data.isPaid) {
+                        clearInterval(pollingRef.current);
+                        clearInterval(timerRef.current);
+                        setStage('completed');
+                    } else if (data.status === 'Failed' || data.status === 'Cancelled' || data.status === 'Expired') {
+                        clearInterval(pollingRef.current);
+                        clearInterval(timerRef.current);
+                        setStage('failed');
                     }
                 }
-            } catch (err) {
-                console.error('Lỗi kiểm tra trạng thái:', err);
+            } catch {
+                // Abaikan error jaringan sementara saat polling
             }
         };
 
-        checkServerStatus();
-
-        // 3. Polling server setiap 2 detik
-        pollingRef.current = setInterval(checkServerStatus, 2000);
+        pollStatus(); pollingRef.current = setInterval(pollStatus, 2000);
 
         return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
+            clearInterval(pollingRef.current);
+            clearInterval(timerRef.current);
         };
-    }, [orderId]);
+    }, [stage, orderId, navigate]);
+
+    if (!orderId) {
+        return (
+            <div className="p-6 text-center text-red-500">
+                <h3>Mã đơn hàng không hợp lệ.</h3>
+            </div>
+        );
+    }
+
+    if (stage === 'action') {
+        return (
+            <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md border text-center">
+                <h2 className="text-xl font-bold mb-4">Cổng thanh toán giả lập (Mock Gateway)</h2>
+                <p className="text-gray-600 mb-6">Đơn hàng #{orderId}</p>
+
+                {errorMessage && (
+                    <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+                        {errorMessage}
+                    </div>
+                )}
+
+                <div className="flex justify-center gap-4">
+                    <button
+                        type="button"
+                        onClick={() => handleSimulatePayment('Success')}
+                        className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md shadow transition"
+                    >
+                        Thanh toán thành công (Success)
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleSimulatePayment('Failure')}
+                        className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md shadow transition"
+                    >
+                        Thanh toán thất bại (Failure)
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (stage === 'confirming') {
+        return (
+            <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md border text-center">
+                <h2 className="text-xl font-bold mb-3">Đang xác nhận thanh toán...</h2>
+                <p className="text-gray-600 mb-4">
+                    Hệ thống đang kiểm tra giao dịch với máy chủ ({secondsLeft}s)
+                </p>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4" />
+                {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
+            </div>
+        );
+    }
+
+    if (stage === 'completed') {
+        return (
+            <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md border text-center">
+                <h2 className="text-xl font-bold text-green-600 mb-2">Thanh toán thành công!</h2>
+                <p className="text-gray-600 mb-6">Đơn hàng #{orderId} đã được thanh toán.</p>
+                <Link
+                    to={`/orders/${orderId}`}
+                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                    Xem chi tiết đơn hàng
+                </Link>
+            </div>
+        );
+    }
+
+    if (stage === 'failed') {
+        return (
+            <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md border text-center">
+                <h2 className="text-xl font-bold text-red-600 mb-2">Thanh toán thất bại</h2><p className="text-gray-600 mb-6">Đơn hàng #{orderId} chưa hoàn tất thanh toán.</p>
+                <Link
+                    to={`/orders/${orderId}`}
+                    className="inline-block px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                    Quay lại đơn hàng
+                </Link>
+            </div>
+        );
+    }
 
     return (
-        <div style={{ maxWidth: '600px', margin: '40px auto', padding: '24px', textAlign: 'center', background: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <h2>Kết quả thanh toán đơn hàng: ORD-{orderId}</h2>
-
-            {paymentStatus === 'confirming' && (
-                <div style={{ marginTop: '20px' }}>
-                    <p style={{ fontSize: '18px', color: '#0284c7' }}>⏳ {statusMessage}...</p>
-                    <p style={{ color: '#64748b', fontSize: '14px' }}>Hệ thống đang tự hỏi lại máy chủ mỗi 2 giây.</p>
-                </div>
-            )}
-
-            {paymentStatus === 'paid' && (
-                <div style={{ marginTop: '20px' }}>
-                    <p style={{ fontSize: '20px', color: '#16a34a', fontWeight: 'bold' }}>✅ {statusMessage}</p>
-                    <div style={{ marginTop: '16px' }}>
-                        <Link to={ticketUrl} style={{ padding: '10px 20px', background: '#2563eb', color: '#fff', borderRadius: '6px', textDecoration: 'none' }}>Xem vé của bạn
-                        </Link>
-                    </div>
-                </div>
-            )}
-
-            {paymentStatus === 'timeout' && (
-                <div style={{ marginTop: '20px' }}>
-                    <p style={{ fontSize: '18px', color: '#d97706', fontWeight: 'bold' }}>⏱️ Hết thời gian chờ</p>
-                    <p style={{ marginTop: '8px', color: '#475569' }}>{statusMessage}</p>
-                    <div style={{ marginTop: '16px' }}>
-                        <Link to="/orders/history" style={{ padding: '10px 20px', background: '#475569', color: '#fff', borderRadius: '6px', textDecoration: 'none' }}>
-                            Kiểm tra trong lịch sử đơn
-                        </Link>
-                    </div>
-                </div>
-            )}
+        <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md border text-center">
+            <h2 className="text-xl font-bold text-amber-600 mb-2">Hết thời gian chờ phản hồi</h2>
+            <p className="text-gray-600 mb-6 text-sm">
+                Giao dịch đang được xử lý hoặc mất kết nối. Trạng thái đơn hàng vẫn được giữ nguyên trên hệ thống.
+            </p>
+            <div className="flex flex-col gap-3">
+                <Link
+                    to={`/orders/${orderId}`}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+                >
+                    Kiểm tra lại đơn hàng #{orderId}
+                </Link>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setStage('action');
+                        setSecondsLeft(60);
+                    }}
+                    className="text-sm text-gray-500 hover:underline"
+                >
+                    Thử lại thanh toán
+                </button>
+            </div>
         </div>
     );
 }

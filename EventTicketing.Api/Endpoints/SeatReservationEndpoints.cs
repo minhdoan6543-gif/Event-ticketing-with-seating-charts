@@ -264,15 +264,27 @@ public static class SeatReservationEndpoints
         .RequireAuthorization(AccessPolicies.SeatBooking);
 
         app.MapGet("/api/orders/{orderId:int}/payment-status", async (
-    int orderId,
-            EventTicketing.Api.Data.AppDbContext db) =>
+            int orderId,
+            EventTicketing.Api.Data.AppDbContext db,
+            ClaimsPrincipal user) =>
         {
+            var currentUserId = AccessPolicies.UserId(user);
+            if (!currentUserId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
             var order = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
                 .FirstOrDefaultAsync(db.Orders, o => o.Id == orderId);
 
             if (order == null)
             {
                 return Results.NotFound(new { message = "Không tìm thấy đơn hàng." });
+            }
+
+            if (order.UserId != currentUserId.Value)
+            {
+                return Results.Json(new { message = "Bạn không có quyền truy cập đơn hàng này." }, statusCode: StatusCodes.Status403Forbidden);
             }
 
             var statusText = order.Status.ToString();
@@ -284,12 +296,14 @@ public static class SeatReservationEndpoints
                 orderId = order.Id,
                 status = statusText,
                 isPaid = isPaid,
-                ticketUrl = $"/tickets/order/{order.Id}"
+                ticketUrl = isPaid ? $"/tickets/order/{order.Id}" : null
             });
         })
         .WithName("GetOrderPaymentStatus")
-        .AllowAnonymous();
-        return app;
-    }
+        .RequireAuthorization();
 
+        return app; // <--- PASTIKAN BARIS INI ADA DAN MEMILIKI TITIK KOMA (;)
+    }
 }
+
+
